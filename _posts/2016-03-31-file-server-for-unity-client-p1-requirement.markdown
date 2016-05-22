@@ -1,7 +1,6 @@
 ---
 layout: post
 title: Unity 클라이언트용 파일서버 구축 - 1. 요구사항
-description: Unity Asset Bundle의 캐시 시스템 구축에 필요한 요구사항 분석.
 ---
 
 # Unity 클라이언트를 위한 파일서버 구축하기
