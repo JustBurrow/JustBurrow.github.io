@@ -260,19 +260,19 @@ public class SomeClassTest3Varargs {
   /**
    * 가변 변수로 메서드 실행을 객체화한 {@link ThrowingCallable} 목록을 받고, 메서드 호출을 실행한 후 발생한 예외를 검증한다.
    */
-  private void assertHelper(Class<? extends Throwable> e, ThrowingCallable... callables) {
+  private void assertHelper(ThrowingCallable... callables) {
     for (ThrowingCallable callable : callables) {
-      assertThatThrownBy(callable).isInstanceOf(e)
+      assertThatThrownBy(callable).isInstanceOf(IllegalArgumentException.class)
           .hasMessageMatching("text length : [0-2]");
     }
   }
 
   /**
-   * 테스트 헬퍼({@link #assertHelper(Class, ThrowingCallable...)})를 호출해 단위 테스트를 실행하자.
+   * 테스트 헬퍼({@link #assertHelper(ThrowingCallable...)})를 호출해 단위 테스트를 실행하자.
    */
   @Test
   public void testSomeMethodWithShortTextViaHelper() throws Exception {
-    this.assertHelper(IllegalArgumentException.class,
+    this.assertHelper(
         () -> this.sc.someMethod(""),
         () -> this.sc.someMethod("1"),
         () -> this.sc.someMethod("12"));
