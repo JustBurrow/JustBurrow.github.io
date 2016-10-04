@@ -167,6 +167,7 @@ public class FooRepositoryTest {
 ```
 
 추가한 H2 의존성 :
+
 ```maven
 <dependency>
   <groupId>com.h2database</groupId>
@@ -303,4 +304,19 @@ spring-boot14-v3                                  # 전체 프로젝트 관리 �
 
 > domain <- jpa <- business <- rest
 
-의 직선적인 형식을 가지지만, `business` 모듈을 공유해 HTML의 웹 애플리케이션을 추가로 개발하는 경우도 생각해볼 수 있다. 
+의 직선적인 형식을 가지지만, `business` 모듈을 공유해 HTML의 웹 애플리케이션을 추가로 개발하는 경우도 생각해볼 수 있다.
+
+### JPA 모듈 테스트
+
+JUnit 테스트를 `@org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest`로 설정하면, 실재 DB가 아닌 테스트용 메모리 DB를 사용할 수 있다.
+
+메인 JDBC Driver인 MySQL 의존성을 지우고, Apache Derby를 테스트 스코프로 추가한다.
+
+```maven
+<dependency><!-- Maven -->
+  <groupId>org.apache.derby</groupId>
+  <artifactId>derby</artifactId>
+  <scope>test</scope>
+</dependency>
+```
+`spring-boot-autoconfigure` 모듈의 `org.springframework.boot.autoconfigure.jdbc.EmbeddedDatabaseConnection`를 보면, 테스트용 메모리 DB로 H2도 사용할수 있는 것으로 보이지만, 테스트용 JDBC 모듈로 H2(`h2database`)를 사용하면 `DataSource` 빈을 생성하지 못하는 위의 에러가 발생한다.
