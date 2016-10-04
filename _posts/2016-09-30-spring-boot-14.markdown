@@ -256,3 +256,51 @@ Caused by: java.lang.IllegalStateException: Cannot determine embedded database f
 	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.initializeBean(AbstractAutowireCapableBeanFactory.java:1579) ~[spring-beans-4.3.3.RELEASE.jar:4.3.3.RELEASE]
 	... 63 common frames omitted
 </pre>
+
+## 모듈 분리(v3)
+
+각 레이어를 따로 다룰 수 있도록 모듈로 분리한다. 덤으로 레이어별로 전용 설정으로 테스트 할 수 있게 된다.
+
+모듈 구성 :
+<pre>
+spring-boot14-v3                                  # 전체 프로젝트 관리 모듈
+├── spring-boot14-v3-business                     # 비지니스 로직(서비스) 모듈
+│   └──kr/lul/pages/spring/boot14/v3
+│      └── business
+│          ├── dto
+│          │   └── FooDto.java
+│          └── service
+│              ├── FooService.java
+│              └── FooServiceImpl.java
+├── spring-boot14-v3-domain                       # 도메인 오브젝트 모듈
+│   └── kr/lul/pages/spring/boot14/v3
+│       └── domain
+│           └── Foo.java
+├── spring-boot14-v3-jpa                          # DB 매핑(JPA) 모듈
+│   └── kr/lul/pages/spring/boot14/v3
+│       └── jpa
+│           ├── converter
+│           │   └── InstantBigintConverter.java
+│           ├── entity
+│           │   └── FooEntity.java
+│           └── repository
+│               └── FooRepository.java
+└── spring-boot14-v3-rest
+    └── kr/lul/pages/spring/boot14/v3
+        └── rest
+            ├── Spring14Runner.java
+            ├── controller
+            │   ├── FooController.java
+            │   └── FooControllerImpl.java
+            └── resp
+                ├── FooListResp.java
+                └── FooResp.java
+</pre>
+
+`kr.lul.pages.spring.boot14.v3`를 프로젝트의 기본 패키지로 하고, 그 밑에 각 모듈용 패키지를 둔다.
+
+이 구성에서는 의존성이
+
+> domain <- jpa <- business <- rest
+
+의 직선적인 형식을 가지지만, `business` 모듈을 공유해 HTML의 웹 애플리케이션을 추가로 개발하는 경우도 생각해볼 수 있다. 
