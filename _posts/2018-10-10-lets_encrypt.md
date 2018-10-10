@@ -7,7 +7,7 @@ layout: post
 ## 목표
 
 1. [https://lul.kr]용 TLS 인증서 발급받기.
-1. GKE를 사용해서 발급받기.
+1. GKE(Google Cloud Platform의 Kubernetes 클러스터 서비스)를 사용해서 발급받기.
 1. GKE를 사용해서 스태틱 웹 서비스 하기.
 
 ## 단계
@@ -140,7 +140,51 @@ FROM nginx:1.14.0
 COPY ./html /usr/share/nginx/html
 ```
 
+## GKE 실행
+
+내가 만든 도커 이미지를 사용해 GKE에서 실행한다.
+
+1. [GCP 콘솔](https://console.cloud.google.com/home/dashboard) 접속.
+1. [탐색 메뉴 > Kubernetes Engine > 클러스터](https://console.cloud.google.com/kubernetes/list)
+1. "클러스터 만들기" : 저렴하게 설정.
+  - 이름 : 적당히
+  - 위치 유형 : `영역`(기본값)
+  - 영역 : `asia-northeast1-a`
+  - 노드풀 > 맞춤설정 > 고급 수정
+    - 노드 수 : `1`
+    - 코어 : `1` vCPU
+    - 메모리 : `1` GB
+    - 부팅 디스크 유형 : `표준 영구 디스크`
+    - 부팅 디스크 크기(GB) : `40`
+1. "만들기"
+1. `docker build -t gcr.io/[GCP 프로젝트ID]/nginx .`
+  - 이미지 태그를 이 형식으로 해야만 받아주는 듯? `justburrow/nginx`를 사용했을 땐 `denied` 였다.
+1. `gcloud` 설치
+  1. `brew cask install google-cloud-sdk`
+  1. `gcloud init`
+1. `gcloud docker -- push gcr.io/[GCP 프로젝트ID]/nginx`
+1. 탐색메뉴 > 도구 > Container Registry
+  - Docker 컨테이너 이미지가 올라온 것을 확인할 수 있다.
+
 ## 참고
 
 - [Getting certificates (and choosing plugins)](https://certbot.eff.org/docs/using.html#manual)
 - [How to Set Up Free SSL Certificates from Let's Encrypt using Docker and Nginx](https://www.humankode.com/ssl/how-to-set-up-free-ssl-certificates-from-lets-encrypt-using-docker-and-nginx)
+- [Docker - Build, Ship, and Run Any App, Anywhere](https://www.docker.com)
+- [Docker Hub](https://hub.docker.com)
+- [GCP Kubernetes Engine](https://console.cloud.google.com/kubernetes)
+
+### GKE 클러스터
+
+클러스터 정보 보기 : `gcloud container clusters list`
+
+클러스터 일시 정지 : `gcloud container clusters resize cluster-1 --size=0 --region=asia-northeast1-a`
+```zsh
+➜  nginx git:(docker-nginx) ✗ gcloud container clusters resize cluster-1 --size=0 --region=asia-northeast1-a
+Pool [default-pool] for [cluster-1] will be resized to 0.
+
+Do you want to continue (Y/n)?  Y
+
+Resizing cluster-1...done.
+Updated [https://container.googleapis.com/v1/projects/[GCP 프로젝트ID]/zones/asia-northeast1-a/clusters/cluster-1].
+```
