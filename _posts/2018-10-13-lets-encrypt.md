@@ -256,6 +256,17 @@ nginx   LoadBalancer   [ 내부IP ]      35.221.118.51   80:30472/TCP   2m33s
 ```
 
 ![배포 결과]({{ base.url }}/assets/lets-encrypt/deploy_result_by_ip.png)
+
+## DNS
+
+[http://lul.kr]을 [http://35.221.118.51]로 연결하기.
+
+[Google Cloud DNS](https://cloud.google.com/dns)를 사용하려고 했으나,
+도메인 관리 회사에 네임 서버가 [dnsever](https://kr.dnsever.com)의 네임서버만 유효하고 구글 네임서버 정보가 달라서 바꾸려 했으나 실패.~~죽어라 본인인증~~
+
+1. `도메인 선택 > 호스트 IP(A) 관리 > 호스트 IP(A) 추가 > '35.221.118.51' 추가`
+1. 브라우저에서 바로 확인 가능.
+
 ## 참고
 
 - [Quickstart - Kubernetes Engine Documentation - Google Cloud](https://cloud.google.com/kubernetes-engine/docs/quickstart)
