@@ -1,8 +1,7 @@
 ---
-title: Let's Encrypt
+title: Let's Encrypt - 1. NGINX 스태틱 웹
 layout: post
 ---
-# Let's Encrypt
 
 ## 목표
 
