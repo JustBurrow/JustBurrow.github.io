@@ -3,8 +3,6 @@ layout: post
 title: MacOS X Yosemite에 jekyll 설치하기
 ---
 
-# MacOS X Yosemite에 jekyll 설치하기
-
 다음을 위해 한 일을 기록한 글입니다.
 
 1. GitHub Pages를 사용한 블로그 만들기.

@@ -3,8 +3,6 @@ title: 인공지능 생태계
 layout: post
 ---
 
-# 인공지능 생태계
-
 알파고가 인공지능에 관심을 끌어온 주역이지만, 산업적으로 바둑은 별 의미가 없다. 인공지능의 주역이자 뗄래야 뗄 수 없는 파트너는 바로 자동주행전기자동차이다.
 
 ![지금의 AI 생태계. 미완성이다.]({{ site.url }}/assets/ai-ecosystem/ai-ecosystem-incomplete.png)

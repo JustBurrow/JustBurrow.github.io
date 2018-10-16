@@ -2,6 +2,7 @@
 layout: post
 title: Kobalttown에 대해서
 ---
+
 [Kobalttown 코드 저장소](https://github.com/JustBurrow/kobalttown)
 
 Kobalttown은 Micro API 플랫폼 개발 프로젝트이다. 애플리케이션은 많아도 사용하는 유틸리티나 DB는 분야에 따라 대표적인 몇 개만 사용해서 만들 수 있는 것 처럼, 공통 기능은 플랫폼 기능을 사용하고 애플리케이션에 필요한 기능만 개발해 플러그인처럼 끼워넣어 사용할 수 있는 API 플랫폼을 목표로 한다.

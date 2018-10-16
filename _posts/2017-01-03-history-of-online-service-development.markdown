@@ -1,6 +1,6 @@
 ---
-layout: post
 title: 온라인 서비스 개발의 역사
+layout: post
 ---
 ## 제 1시대 : Hardware의 시대
 

@@ -3,8 +3,6 @@ title: 프로비저닝 잡담
 layout: post
 ---
 
-# 잡담
-
 `VirtualBox` + `Vagrant` + `Ansible` 조합으로 로컬 개발환경을 구축하고 여기에 사용한 `playbook`을 서버 환경에 적용할 생각이었다.
 
 1. `CentOS 7` VM 구성.
