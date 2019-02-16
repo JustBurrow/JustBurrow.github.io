@@ -1,5 +1,5 @@
 ---
-title: Gradle subprojects로 구조적(?)인 프로젝트 만들기.
+title: Gradle implementation을 subprojects에서 쓸 때 생기는 의존성 오류
 layout: post
 ---
 
@@ -101,5 +101,7 @@ bootJar.enabled = true
 
 **그런데 이렇게 하면 IntelliJ IDEA의 Gradle 리프레시는 성공하는데, 빌드(`./gradlew build`)는 실패한다.**
 
-매우 삽질을 했는데... `implementation`을 `compile`로, `testImplementation`을 `testCompile`로 바꾸면 잘 된다.
+`runner`는 `web`의 클래스를 임포트 할 수 없고, `web`은 `core`를 임포트 할 수 없는, **의존성이 반영되지 않는 문제가 생기는 거다**.
+
+매우 삽질을 했는데... 예전에 했던 프로젝트를 따라서 `implementation`을 `compile`로, `testImplementation`을 `testCompile`로 바꾸면 잘 된다.
 Gradle 5.0/5.2는 `subprojects`에서 `implementation`을 지원하지 않는 모양이다.
