@@ -40,6 +40,8 @@ JUnit test config :
 
 ![JUnit test config]({{ base.url }}/assets/gradle-subprojects/java-groovy/IntelliJ_JUnit_config.png)
 
+JUnit test 실행 결과 :
+
 ```
 java.lang.IllegalStateException: Failed to load ApplicationContext
 
@@ -96,3 +98,13 @@ Caused by: org.springframework.beans.factory.support.BeanDefinitionOverrideExcep
 	at org.springframework.test.context.cache.DefaultCacheAwareContextLoaderDelegate.loadContext(DefaultCacheAwareContextLoaderDelegate.java:117)
 	... 33 more
 ```
+
+에러 내용은 `kr.lul.pages.gradle.subprojects.java.groovy.core.CoreModuleTestConfiguration`가 `kr.lul.pages.gradle.subprojects.java.groovy.util.GeneralUtil` bean을 이미 만들었는데 `kr.lul.pages.gradle.subprojects.java.groovy.test.util.TestUtilModuleTestConfiguration`에서 또 만드려고 한다는 거다.
+
+`java-groovy-test-util` 모듈(서브프로젝트)의 테스트 코드가 `java-groovy-core` 모듈의 테스트 코드를 보고 있다는 뜻이다.
+
+![`CoreModuleTestConfiguration` 접근 코드.]({{ base.url }}/assets/gradle-subprojects/java-groovy/test_code_access_code.png)
+
+![`CoreModuleTestConfiguration` 접근 실패.]({{ base.url }}/assets/gradle-subprojects/java-groovy/test_code_access_fail.png)
+
+그런데 이렇게 소스코드에서는 접근하지 못한다.
