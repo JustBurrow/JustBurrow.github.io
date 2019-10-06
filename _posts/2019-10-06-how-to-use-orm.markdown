@@ -10,3 +10,21 @@ layout: post
 > 회원는 상품을 구매할 수 있고, 구매 여부와 상관없이 각 상품에 대해 평가와 평점을 남길 수 있다.
 >
 > 관리자는 분류별, 상품별, 회원별로 구매 목록과 평가, 평점을 볼 수 있다.
+
+## 상품과 분류
+
+![상품과 분류]({{ site.url }}/assets/how-to-use-orm/class_diagram_1.png)
+
+- 상품(`Product`)과 분류(`Category`) 엔티티를 추가.
+
+## 각 분류에는 여러 개의 상품을 목록으로 보여준다
+
+![상품과 분류의 관계]({{ site.url }}/assets/how-to-use-orm/class_diagram_2.png)
+
+- 분류에 여러 상품을 볼 수 있도록 릴레이션을 추가.
+
+## 각 상품은 여러 분류에서 보이도록 할 수 있다
+
+![상품과 분류의 M:N 관계]({{ site.url }}/assets/how-to-use-orm/class_diagram_3.png)
+
+- 하나의 상품을 여러 분류에서도 볼 수 있도록 하려면, `분류 : 상품`은 `M : N` 관계로 변경한다.
