@@ -97,6 +97,29 @@ public class CategoryController {
   }
 }
 ```
+```java
+@Entity(name = "Category")
+@Table(name = "category")
+public class Category {
+  @ManyToMany
+  @JoinTable(name = "rel_category_product",
+      joinColumns = @JoinColumn(name = "category",
+          nullable = false,
+          updatable = false,
+          foreignKey = @ForeignKey(name = "FK_CATEGORY_PRODUCT_PK_CATEGORY"),
+          referencedColumnName = "id"),
+      inverseJoinColumns = @JoinColumn(name = "product",
+          nullable = false,
+          updatable = false,
+          foreignKey = @ForeignKey(name = "FK_CATEGORY_PRODUCT_PK_PRODUCT"),
+          referencedColumnName = "id"))
+  private List<Product> products = new ArrayList<>();
+
+  public List<Product> getProducts() {
+    return unmodifiableList(this.products);
+  }
+}
+```
 ```html
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale}">
