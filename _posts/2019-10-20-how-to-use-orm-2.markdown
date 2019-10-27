@@ -46,3 +46,30 @@ public class CategoryController {
   }
 }
 ```
+```html
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:lang="${#locale}">
+<head>
+    <title th:text="${category.name}">Category</title>
+</head>
+<body>
+<main>
+    <h1 th:text="${category.name}">Category</h1>
+    <section>
+        <h2>Products</h2>
+        <table>
+            <caption>Products</caption>
+            <thead><tr><th><span>ID</span></th><th><span>NAME</span></th></tr></thead>
+            <tbody>
+            <tr th:each="product : ${products}">
+                <td><span th:text="${product.id}">id</span></td>
+                <td><span th:text="${product.name}">name</span></td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+</main>
+</body>
+</html>
+```
