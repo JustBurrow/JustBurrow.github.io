@@ -37,7 +37,7 @@ public class CategoryController {
   @GetMapping("/category/{id:[1-9]\\d*}")
   public String read(@PathVariable("id") final long id, final Model model) {
     Category category = this.categoryService.read(id);
-    List<Product> products = this.productService.products(id);
+    List<Product> products = this.productService.products(id);  // OM에서 product 테이블을 읽는 시점.
 
     model.addAttribute("category", category);
     model.addAttribute("products", products);
@@ -114,7 +114,7 @@ public class CategoryController {
             <tr><th><span>ID</span></th><th><span>NAME</span></th></tr>
             </thead>
             <tbody>
-            <tr th:each="product : ${category.products}">
+            <tr th:each="product : ${category.products}"><!-- ORM에서 product 테이블을 읽는 시점. -->
                 <td>
                     <span th:text="${product.id}">id</span>
                 </td>
@@ -129,3 +129,21 @@ public class CategoryController {
 </body>
 </html>
 ```
+
+## 비교
+
+|OM(MyBatis)|ORM(JPA/Hibernate)|
+|--|---|
+|![OM category page sequence diagram]({{ base.url }}/assets/how-to-use-orm/om_category_page_sequence_diagram.jpg)|![ORM category page sequence diagram]({{ base.url }}/assets/how-to-use-orm/orm_category_page_sequence_diagram.jpg)|
+
+분류(`Category`)를 읽을 때까지는 동일하지만 이후의 코드가 다르다.
+
+- OM은 제품목록을 읽는 로직이 `CategoryService`와 `ProductService`를 사용할 수 있는 컨트롤러(`CategoryController.read(long, Model)`)에 있다.
+- ORM은 제품목록을 읽는 로직이 분류(`Category`) 자신이 가지고(`getProducts()` 메서드) 있다.
+
+이 차이 때문에 OM은 `CategoryController`에 접근할 수 있어야만 카테고리의 제품 목록을 알 수 있지만, ORM은 `Category`에 접근할 수 있으면 어떤 로직에서도 제품 목록을 알아낼 수 있다.
+
+## 기타
+
+`MyBatis`의 result set을 사용하면 분류를 읽을 때 제품목록도 함께 읽을 수 있다.
+하지만 제품 목록이 필요 없을 경우에도 항상 제품 목록을 읽기 때문에 SQL 쿼리 최적화를 할 수 없게 된다.
