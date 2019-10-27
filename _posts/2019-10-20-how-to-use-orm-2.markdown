@@ -22,6 +22,7 @@ tags: [orm, modeling]
 1. `CategoryService`에 분류 정보를 요청한다.
 1. `ProductService`에 분류에 해당하는 상품 목록을 요청한다.
 1. `CategoryController`가 `Model`에 분류와 상품 목록을 추가하고, 템플릿 이름을 반환한다.
+1. 템플릿이 분류(`category`)와 상품(`products`) 정보를 출력한다.
 
 ![OM category page sequence diagram]({{ base.url }}/assets/how-to-use-orm/om_category_page_sequence_diagram.jpg)
 
@@ -44,70 +45,4 @@ public class CategoryController {
     return "page/category";
   }
 }
-```
-```java
-@Service
-public class CategoryService {
-  @Autowired
-  private CategoryDao categoryDao;
-
-  public Category read(long id) {
-    Category category = this.categoryDao.read(id);
-    return category;
-  }
-}
-```
-```java
-@Service
-public class ProductService {
-  @Autowired
-  private ProductDao productDao;
-
-  public List<Product> products(long categoryId) {
-    List<Product> products = this.productDao.listByCategory(categoryId);
-    return products;
-  }
-}
-```
-```html
-<!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org"
-      th:lang="${#locale}">
-<head>
-    <meta name="author" content="justburrow" th:remove="all"/>
-    <meta name="since" content="2019/10/27 20:04" th:remove="all"/>
-    <meta charset="UTF-8"/>
-    <!--/*@thymesVar id="category" type="kr.lul.pages.how.to.use.orm.om.model.Category"*/-->
-    <title th:text="${category.name}">Category</title>
-</head>
-<body>
-<main>
-    <!--/*@thymesVar id="category" type="kr.lul.pages.how.to.use.orm.om.model.Category"*/-->
-    <h1 th:text="${category.name}">Category</h1>
-    <section>
-        <h2>Products</h2>
-        <!--/*@thymesVar id="products" type="java.util.List<kr.lul.pages.how.to.use.orm.om.model.Product>"*/-->
-        <table>
-            <caption>Products</caption>
-            <thead>
-            <tr>
-                <th><span>ID</span></th>
-                <th><span>NAME</span></th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr th:each="product : ${products}">
-                <td>
-                    <span th:text="${product.id}">id</span>
-                </td>
-                <td>
-                    <span th:text="${product.name}">name</span>
-                </td>
-            </tr>
-            </tbody>
-        </table>
-    </section>
-</main>
-</body>
-</html>
 ```
