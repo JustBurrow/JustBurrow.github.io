@@ -32,3 +32,11 @@ tag: [file exchange, dropbox, cloud storage]
 ### Use case
 
 ![use case]({{ base.url }}/assets/file_exchange_application_with_dropbox/usecase.png)
+
+### BPMN
+
+플로우차트보단 알아보기 쉬울 것 같아 BPMN 표기법으로 시나로오를 정리해봤다.
+
+BPMN은 잘 모른다. 엄격한 표기법을 사용한 건 아니고, 그냥 알아볼 수 있는 정도로만 정리.
+
+![BPMN]({{ base.url }}/assets/file_exchange_application_with_dropbox/bpmn.png)
