@@ -40,3 +40,12 @@ tag: [file exchange, dropbox, cloud storage]
 BPMN은 잘 모른다. 엄격한 표기법을 사용한 건 아니고, 그냥 알아볼 수 있는 정도로만 정리.
 
 ![BPMN]({{ base.url }}/assets/file_exchange_application_with_dropbox/bpmn.png)
+
+## 참고
+
+- Dropbox API 문서
+    - [`/create_folder`](https://www.dropbox.com/developers/documentation/http/documentation#files-create_folder)
+    - [`/add_folder_member`](https://www.dropbox.com/developers/documentation/http/documentation#sharing-add_folder_member)
+    - [`/download`](https://www.dropbox.com/developers/documentation/http/documentation#files-download)
+    - [`/download_zip`](https://www.dropbox.com/developers/documentation/http/documentation#files-download_zip)
+- [Dropbox Webhooks](https://www.dropbox.com/developers/reference/webhooks)
