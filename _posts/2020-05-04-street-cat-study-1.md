@@ -11,7 +11,6 @@ tag: [development, 개발, 설계]
 1. 고양이에 인식표를 부착한다.
 2. 인식표를 인식할 수 있는 사료통, 물통, 체중계를 여기저기 배치한다.
 3. 고양이가 사료통, 물통, 체중계를 사용하면 얼마나 사용했는지 측정해서 서버로 보낸다.
-  - 편의상 사용시간만 측정한다.
 4. 서버는 장비가 보낸 정보를 저장하고 통계를 작성한다.
 
 ## 작성할 통계
@@ -34,10 +33,48 @@ tag: [development, 개발, 설계]
 3. 매주 고양이가 각 장비를 사용했는지 통계를 작성한다.
 4. 매일 각 장비의 사용량 통계를 작성한다.
 
-## 도메인 모델
+## DB
 
-![대충 그린 클래스 다이어그램]({{ base.url }}/assets/street-cat-study/1_class_diagram.png)
+![대충 그린 ERD]({{ base.url }}/assets/street-cat-study/1_erd.png)
 
 - 고양이가 장비를 사용하면 인식표가 등록됐는지 확인해서 없으면 `Cat` 데이터를 등록한다.
 - 사료통, 물통, 체중계를 `Device`로 등록한다.
 - 고양이가 장비를 사용한 정보를 `Usage`로 등록한다.
+
+### cats
+
+고양이
+
+|속성|설명|
+|---|---|
+|id|고양이 일련번호.`auto_increment`.|
+|chipId|인식표 ID.|
+|deviceId|장비 ID.|
+|memo|연구원 메모.|
+|createdAt|등록 일시.|
+|updatedAt|갱신 일시.|
+|deletedAt|삭제 일시.|
+
+### devices
+
+장비
+
+|속성|설명|
+|---|---|
+|id|장비 일련번호. `auto_increment`.|
+|deviceId|장비 ID.|
+|type|장비 종류.|
+
+### uses
+
+장비 사용량 정보
+
+|속성|설명|
+|---|---|
+|id|사용량 정보의 일련번호. `auto_increment`|
+|chipId|인식표 ID.|
+|deviceId|장비 ID.|
+|type|종류. 사용시간, 사료, 물, 체중.|
+|value|시간, 사료(g), 물(cc), 체중(kg).|
+|measuredAt|측정 시각.|
+|createdAt|서버 등록 시각.|
