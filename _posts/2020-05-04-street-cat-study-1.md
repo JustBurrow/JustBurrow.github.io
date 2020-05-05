@@ -1,5 +1,5 @@
 ---
-title: 길고양이 연구 - 1
+title: 길고양이 연구 - 1. 문제
 layout: post
 tag: [development, 개발, 설계]
 ---
