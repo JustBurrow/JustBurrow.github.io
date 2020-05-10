@@ -4,6 +4,11 @@ layout: post
 tag: [development, 개발, 설계]
 ---
 
+1. [길고양이 연구 - 1. 문제](/2020/05/04/street-cat-study-1)
+2. [길고양이 연구 - 2. 구현](/2020/05/10/street-cat-study-2)
+
+[길고양이 연구](https://justburrow.gitbook.io/street-cat-study/)로 이동.
+
 길고양이가 얼마나 자주 먹고 마시며 돌아다니는지를 연구 하는 가상의 시스템을 만들어보자.
 
 ## 요구조건

@@ -4,7 +4,10 @@ layout: post
 tags: [개발]
 ---
 
-1. [길고양이 연구 - 1. 문제](2020-05-04-street-cat-study-1.md)
+1. [길고양이 연구 - 1. 문제](/2020/05/04/street-cat-study-1)
+2. [길고양이 연구 - 2. 구현](/2020/05/10/street-cat-study-2)
+
+[길고양이 연구](https://justburrow.gitbook.io/street-cat-study/)로 이동.
 
 ## API
 
@@ -70,6 +73,8 @@ public class CatService {
   }
 }
 ```
+
+## 
 
 ## 참고
 
