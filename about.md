@@ -7,11 +7,12 @@ permalink: /about/
 평범한 서버 개발자입니다.
 
 좋아하는 것 :
-1. `interface`
-2. Java
-3. Spring Boot
-4. JPA/Hibernate
-5. gRPC
+1. Build once, Deploy anywhere.
+2. `interface`
+3. Java
+4. Spring Boot
+5. JPA/Hibernate
+6. gRPC
 
 싫어하는 것 :
 1. NFS를 네트워크로 사용하기. NFS as a Network Protocol.
