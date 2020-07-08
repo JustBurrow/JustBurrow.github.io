@@ -34,12 +34,27 @@ layout: post
 ### 작업
 
 - Spring Boot 애플리케이션 소스코드를 관리할 `app` 저장소와 환경 의존적인 소스코드를 관리할 `app-env-dev`, `app-env-prod` 저장소를 만든다.
-- 테스트용 CircleCI 코드(`.circleci/config.yml`)는 `app` 저장소에 작성한다. `./gradlew test` 태스크를 실행한다.
-- 배포용 CircleCI 코드는 `app-env-dev`, `app-env-prod` 저장소에 작성한다. `./gradlew bootJar` 태스크와 배포 스텝을 실행한다.
-- DB 스키마(DDL) 파일은 `app` 저장소에 작성한다. 현재의 코드에 필요한 스키마를 유지하도록 관리한다.
+- `src/main/resources/application.yml`에는 소스코드 혹은 Gradle 빌드 스크립트의 변경이 필요한 항목만 남긴다.
+- 환경마다 다른 설정 항목은 `app-env-dev`, `app-env-prod`에 작성한다.
+- DB 스키마(DDL) 파일은 `app` 저장소에 작성한다. 현재의 코드에 필요한 스키마를 유지하도록 관리해서 로컬 개발환경에 반영하도록 한다.
 - DB 스키마 변경은 `app` 배포에 연동할 수 있도록 `app-env-dev`, `app-env-prod`에서 관리한다.
+- 작업 브랜치 테스트용 CircleCI 코드(`.circleci/config.yml`)는 `app` 저장소에 작성한다. `./gradlew test` 태스크를 실행한다.
+- 배포용 CircleCI 코드는 `app-env-dev`, `app-env-prod` 저장소에 작성한다. `./gradlew bootJar` 태스크와 배포 스텝을 실행한다.
 
 ## 영향
+
+1. 단순한 CircleCI 코드.
+   - `app/.circleci/config.yml`에서 작업 브랜치의 테스트 잡과 배포 잡을 모두 정의할 필요가 없다.
+   - `app`은 작업 브랜치의 테스트에 집중할 수 있다.
+   - `app-env-dev`, `app-env-prod`은 테스트나 다른 환경에 신경쓸 필요가 없다.
+   - 특정 환경에만 존재하는 스텝을 사용하기 위해 분기를 만들 필요가 없다.
+2. 단순한 CircleCI 이력.
+   - `app` 프로젝트는 작업 브랜치의 테스트 이력만 관리한다.
+   - `app-env-dev`, `app-env-prod` 프로젝트는 각 환경의 배포 이력만 관리한다.
+   - 다수의 테스트 이력 속에서 배포 이력을 찾을 필요가 없다.
+   - 배포 이력이 어떤 환경에 배포한 이력인가 판단할 필요가 없다.
+3. DB와 같은 공유 리소스의 버전 문제가 생기지 않는다.
+4.
 
 ## 참고
 
