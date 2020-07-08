@@ -3,6 +3,57 @@ title: Build Once, Deploy Anywhere
 layout: post
 ---
 
+## 개요
+
+한번만 빌드하면 어떤 환경(인프라)에도 배포, 실행할 수 있도록 CI/CD 시스템을 만드는 전략.
+
+### 특징
+
+- 빌드 결과물은 환경 의존적인 코드를 포함하지 않는다.
+- 빌드 및 배포를 애플리케이션이 담당하지 않는다.
+- 다수의 저장소를 사용한다.
+
+## 필요성
+
+- 애플리케이션은 환경에 의존적이다. 대표적인 환경 요소로 DB 스키마가 있다.
+- Git의 보급으로 서로 다른 변경을 동시에 진행하는 경우가 늘어났다. 하지만 서로 다른 변경이 리소스를 공유할 수 있다는 보장은 없다.
+- 클라우드(GCP, AWS, Azure), 컨테이너(Docker), 컨테이너 클러스터(Kubernetes)의 보급으로 환경을 추가하거나 복제하기 쉬워졌다.
+- Nodejs와 같은 정적 분석이 어려운 스크립트 언어가 보급되어 자동화된 테스트의 중요도가 높아졌다.
+- 인프라를 소스코드로 관리하는 IaC 개념이 보급되었다.
+
+## 실행
+
+### 가정
+
+- MySQL을 사용하는 Spring Boot 기반의 애플리케이션.
+- 빌드 도구는 Gradle을 사용한다.
+- GitHub로 버전 관리.
+- CircleCI로 배포.
+- `dev`, `prod` 2개 환경에 배포.
+
+### 작업
+
+- Spring Boot 애플리케이션 소스코드를 관리할 `app` 저장소와 환경 의존적인 소스코드를 관리할 `app-env-dev`, `app-env-prod` 저장소를 만든다.
+- 테스트용 CircleCI 코드(`.circleci/config.yml`)는 `app` 저장소에 작성한다. `./gradlew test` 태스크를 실행한다.
+- 배포용 CircleCI 코드는 `app-env-dev`, `app-env-prod` 저장소에 작성한다. `./gradlew bootJar` 태스크와 배포 스텝을 실행한다.
+- DB 스키마(DDL) 파일은 `app` 저장소에 작성한다. 현재의 코드에 필요한 스키마를 유지하도록 관리한다.
+- DB 스키마 변경은 `app` 배포에 연동할 수 있도록 `app-env-dev`, `app-env-prod`에서 관리한다.
+
+## 영향
+
+## 참고
+
+- [Build Once, Deploy Anywhere!](https://www.openshift.com/blog/build-once-deploy-anywhere) : Docker 이미지가 대상이지만, 원칙면에서 Java의 JAR 파일도 다르지 않다.
+    - > One of the fundamental principles of Continuous Delivery is **Build Binaries Only Once**. Subsequent deployments, testing and releases should be never attempt to build the binary artifacts again, instead reusing the already built binary. In many cases, the binary is built at each stage using the same source code, and is considered to be “the same”. But it is not necessarily the same because of different environmental configuration or other factors.
+- [Build once, deploy everywhere — part 1](https://medium.com/buildit/build-once-deploy-everywhere-part-1-706d7affaf0f)
+  - > In the DevOps community, there is common agreement on avoiding environment-specific builds. One aims to **build the deployment package once, for any environment**, and set configuration data at deploy time. Such configuration data can be stored in one or more locations; typical examples are launch parameters, environment variables, configuration files, distributed services like etcd, ZooKeeper or Consul.
+  - [Build once, deploy everywhere — part 2](https://medium.com/buildit/build-once-deploy-everywhere-part-2-1e70df05cea5)
+- [Build cloud native Build once, deploy anywhere](https://www.ibm.com/downloads/cas/KBMQLAOM) : 영업용 자료네.
+- [Build Once Deploy Anywhere – Configuring the Build Side](https://hamersmithblog.wordpress.com/2016/10/14/build-once-deploy-anywhere-configuring-the-build-side) : 빌드 시스템에서 배포 대상 서버의 설정 파일을 관리하는 방식에 대해 설명.
+
+<details>
+<summary>memo</summary>
+<pre>
 - 빌드는 한번만 하고, 롤백도 과거 커밋으로 빌드하는 것이 아니라 보관중이던 빌드 패키지를 다시 배포한다.
 - 동일한 커밋을 빌드하더라도, 빌드 시스템의 설정, 패키지 등의 차이로 결과물은 달라질 수 있다.
   - JDK 버전이 바뀔 때, 결과물이 동일하다고 보장할 수 있는가? 동일하지 않더라도 실행 결과는 동일하다고 가정할 수 있는가?
@@ -37,13 +88,5 @@ layout: post
   - 로그 포맷, 로그 레벨
 - 보안 정보가 환경 의존적이라 환경 독립적인 저장소에서 분리했다면, 환경 독립적인 저장소는 공개 저장소로 만들 수 있다.
   - 공개 저장소는 인원과 관점 모두 더 폭넓은 코드 리뷰가 가능해진다.
-
-## 참고
-
-- [Build Once, Deploy Anywhere!](https://www.openshift.com/blog/build-once-deploy-anywhere) : Docker 이미지가 대상이지만, 원칙면에서 Java의 JAR 파일도 다르지 않다.
-    - > One of the fundamental principles of Continuous Delivery is **Build Binaries Only Once**. Subsequent deployments, testing and releases should be never attempt to build the binary artifacts again, instead reusing the already built binary. In many cases, the binary is built at each stage using the same source code, and is considered to be “the same”. But it is not necessarily the same because of different environmental configuration or other factors.
-- [Build once, deploy everywhere — part 1](https://medium.com/buildit/build-once-deploy-everywhere-part-1-706d7affaf0f)
-  - > In the DevOps community, there is common agreement on avoiding environment-specific builds. One aims to **build the deployment package once, for any environment**, and set configuration data at deploy time. Such configuration data can be stored in one or more locations; typical examples are launch parameters, environment variables, configuration files, distributed services like etcd, ZooKeeper or Consul.
-  - [Build once, deploy everywhere — part 2](https://medium.com/buildit/build-once-deploy-everywhere-part-2-1e70df05cea5)
-- [Build cloud native Build once, deploy anywhere](https://www.ibm.com/downloads/cas/KBMQLAOM) : 영업용 자료네.
-- [Build Once Deploy Anywhere – Configuring the Build Side](https://hamersmithblog.wordpress.com/2016/10/14/build-once-deploy-anywhere-configuring-the-build-side) : 빌드 시스템에서 배포 대상 서버의 설정 파일을 관리하는 방식에 대해 설명.
+</pre>
+</details>
