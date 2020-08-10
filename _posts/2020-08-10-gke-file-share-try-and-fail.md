@@ -35,9 +35,9 @@ GCE의 오브젝트 스토리지. AWS라면 S3에 해당한다.
 
 ## 결론
 
-NFS인 [Cloud Filestore](https://cloud.google.com/filestore)를 사용할 수 밖에 없어 보인다.
-
-분산 파일시스템이 아니라는 이유로 NFS를 피해왔는데, 아무래도 무리인 듯 싶다.
+1. NFS인 [Cloud Filestore](https://cloud.google.com/filestore)를 사용할 수 밖에 없어 보인다.
+  - 분산 파일시스템이 아니라는 이유로 NFS를 피해왔는데, 아무래도 무리인 듯 싶다.
+2. **매뉴얼을 잘 읽자.**
 
 ## 참고
 
