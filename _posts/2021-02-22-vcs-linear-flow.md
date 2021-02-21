@@ -1,5 +1,5 @@
 ---
-title: VCS Linear History
+title: VCS Linear Flow
 layout: post
 ---
 
