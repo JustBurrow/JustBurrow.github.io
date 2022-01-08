@@ -1,7 +1,7 @@
 # Site settings
 title: 일단 버로우
 email: just.burrow@lul.kr
-description: 아침 점심 저녁 다 <sub><strike>회사에서</strike></sub> 먹고 다니는 서버 개발자.
+description: 필요한데 없으면 만들어야지.
 baseurl: "" # the subpath of your site, e.g. /blog/
 url: "" # the base hostname & protocol for your site
 github_username: JustBurrow
