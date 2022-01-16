@@ -32,7 +32,7 @@ layout: post
 
 단순 문자열로 비교할 경우, `1.2.3`과 `1.2.10`을 비교하면 `1.2.3`가 업데이트가 필요 없다고 인식하는 문제가 생긴다.
 
-```Kotlin
+```kotlin
 fun checkUpdate(current: String, required: String): Boolean {
     return if (current < required) {
         true
@@ -46,7 +46,7 @@ fun checkUpdate(current: String, required: String): Boolean {
 
 프로시저 내부에서 버전 비교에 필요한 `major`, `minor`, `patch`를 추출해서 숫자료 변경하고 업데이트가 필요한지 판단한다.
 
-```Kotlin
+```kotlin
 fun someLogic() {
     val current = "1.2.3"   // 어디선가 읽어온 현재 버전.
     val required = "1.2.4"  // 어디선가 읽어온 필요 버전.
@@ -58,7 +58,7 @@ fun someLogic() {
     // 기타 기능.
 }
 ```
-```Kotlin
+```kotlin
 const val VERSION_CORE_PATTERN = "(\\d+)\\.(\\d+)\\.(\\d+)"
 const val PRE_RELEASE_PATTERN = "[\\da-zA-Z]+(\\.[\\da-zA-Z]+)*"
 const val BUILD_PATTERN = "[\\da-zA-Z]+"
@@ -93,7 +93,7 @@ fun checkUpdate(current: String, required: String): Boolean {
 
 `major`, `minor`, `patch` 외에도 `preRelease`, `build`까지 정보를 유지하는 자료구조를를 사용해서 업데이트가 필요한지 판단한다.
 
-```Kotlin
+```kotlin
 fun someLogic() {
     val current = "1.2.3"   // 어디선가 읽어온 현재 버전.
     val required = "1.2.4"  // 어디선가 읽어온 필요 버전.
@@ -126,7 +126,7 @@ fun convert(name: String): SemanticVersion {
     return SemanticVersion(major, minor, patch, preRelease, build)
 }
 ```
-```Kotlin
+```kotlin
 data class SemanticVersion(
         val major: Int,
         val minor: Int,
@@ -145,7 +145,7 @@ fun checkUpdate(current: SemanticVersion, required: SemanticVersion): Boolean {
 
 ### 오브젝트(Object)
 
-```Kotlin
+```kotlin
 fun someLogic() {
     val current = "1.2.3"   // 어디선가 읽어온 현재 버전.
     val required = "1.2.4"  // 어디선가 읽어온 필요 버전.
@@ -162,7 +162,7 @@ fun someLogic() {
     println("required.major=${requiredVersion.major}")
 }
 ```
-```Kotlin
+```kotlin
 class SemanticVersion : Comparable<SemanticVersion> {
     companion object {
         const val VERSION_CORE_PATTERN = "(\\d+)\\.(\\d+)\\.(\\d+)"
@@ -253,7 +253,7 @@ OOP에서 말하는 오브젝트는 상태와 기능을 함께 관리하는 디�
 
 더 높은 버전인지 검사하는 `checkUpdate` 메서드 내부에서 크기 비교에 사용할 `major`, `minor`, `patch`를 추출하고 적절한 비교가 가능하도록 정수로 변환한 후에 버전을 비교해서 결과를 반환한다.
 
-```Kotlin
+```kotlin
 fun checkUpdate(current: String, required: String): Boolean {
     val currentValues = VERSION_REGEX.find(current)!!.groupValues
     val requiredValues = VERSION_REGEX.find(required)!!.groupValues
@@ -284,7 +284,7 @@ fun checkUpdate(current: String, required: String): Boolean {
 
 유의적 버전의 각 부분을 속성으로 가지는 자료구조를 정의하고 문자열을 자료구조로 변환하는 유틸리티 메서드를 추가했다.
 
-```Kotlin
+```kotlin
 // 자료구조
 data class SemanticVersion(
         val major: Int,
@@ -297,7 +297,7 @@ data class SemanticVersion(
 
 속성을 추출하는 코드를 메서드로 분리하면서 콜 스택의 증가, 코드와 변수의 메모리 사용량의 증가를 대가로 한 번 추출한 속성을 계속해서 사용할 수 있게 된다.
 
-```Kotlin
+```kotlin
 // 변환 유틸리티 메서드.
 fun convert(name: String): SemanticVersion {
     val values = VERSION_REGEX.find(name)!!.groupValues
@@ -314,7 +314,7 @@ fun convert(name: String): SemanticVersion {
 
 그러나 버전을 비교하기 위해선 `checkUpdate(current: SemanticVersion, required: SemanticVersion)` 함수를 호출해야만 한다.
 
-```Kotlin
+```kotlin
 fun checkUpdate(current: SemanticVersion, required: SemanticVersion): Boolean {
     return current.major < required.major ||
             (current.major == required.major && current.minor < required.minor) ||
@@ -330,7 +330,7 @@ fun checkUpdate(current: SemanticVersion, required: SemanticVersion): Boolean {
 
 추가로 `constructor(major: Int, minor: Int, patch: Int, preRelease: String? = null, build: String? = null)`를 마련해 문자열을 해석하는 것이 아니라 코드상에서 직접 인스턴스를 만드는 용도로 준비한다.
 
-```Kotlin
+```kotlin
 class SemanticVersion : Comparable<SemanticVersion> {
     var major: Int
       private set(value) {
@@ -366,7 +366,7 @@ Kotlin 언어 특성으로 버전을 비교할 때는 `currentVersion < required
 
 `checkUpdate(currentVersion, requiredVersion)` => `currentVersion < requiredVersion`
 
-```Kotlin
+```kotlin
 fun someLogic() {
     val current = "1.2.3"
     val required = "1.2.4"
