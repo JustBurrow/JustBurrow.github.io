@@ -103,7 +103,6 @@ fun someLogic() {
     // 기타 기능.
 }
 
-
 const val VERSION_CORE_PATTERN = "(\\d+)\\.(\\d+)\\.(\\d+)"
 const val PRE_RELEASE_PATTERN = "[\\da-zA-Z-]+(\\.[\\da-zA-Z-]+)*"
 const val BUILD_PATTERN = "[\\da-zA-Z-]+(\\.[\\da-zA-Z-]+)*"
@@ -120,13 +119,6 @@ fun convert(name: String): SemanticVersion {
     val build = values[8].ifBlank { null }
 
     return SemanticVersion(major, minor, patch, preRelease, build)
-}
-```
-```Kotlin
-fun checkUpdate(current: SemanticVersion, required: SemanticVersion): Boolean {
-    return current.major < required.major ||
-            (current.major == required.major && current.minor < required.minor) ||
-            (current.major == required.major && current.minor == required.minor && current.patch < required.patch)
 }
 ```
 
@@ -164,54 +156,19 @@ class SemanticVersion : Comparable<SemanticVersion> {
     }
 
     var major: Int
-        private set(value) {
-            if (0 > value) {
-                throw IllegalArgumentException("negative major number : major=$value")
-            }
-            field = value
-        }
+        private set
 
     var minor: Int
-        private set(value) {
-            if (0 > value) {
-                throw IllegalArgumentException("negative minor number : minor=$value")
-            }
-            field = value
-        }
+        private set
 
     var patch: Int
-        private set(value) {
-            if (0 > value) {
-                throw IllegalArgumentException("negative patch number : patch=$value")
-            }
-            field = value
-        }
+        private set
 
     var preRelease: String?
-        private set(value) {
-            field = if (null == value) {
-                value
-            } else {
-                if (!value.matches(PRE_RELEASE_REGEX)) {
-                    throw IllegalArgumentException("illegal pre-release : preRelease=$value")
-                } else {
-                    value
-                }
-            }
-        }
+        private set
 
     var build: String?
-        private set(value) {
-            field = if (null == value) {
-                value
-            } else {
-                if (!value.matches(BUILD_REGEX)) {
-                    throw IllegalArgumentException("illegal build : build=$value")
-                } else {
-                    value
-                }
-            }
-        }
+        private set
 
     constructor(name: String) {
         VERSION_REGEX.find(name)!!.groupValues.also {
@@ -237,33 +194,18 @@ class SemanticVersion : Comparable<SemanticVersion> {
 
     override fun compareTo(other: SemanticVersion): Int {
         var rv = major.compareTo(other.major)
-        if (0 == rv)
-            rv = minor.compareTo(other.minor)
-        if (0 == rv)
-            rv = patch.compareTo(other.patch)
-
+        // 생략
         return rv
     }
 
     override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as SemanticVersion
-
-        return major == other.major
-                && minor == other.minor
-                && patch == other.patch
-                && preRelease == other.preRelease
-                && build == other.build
+        // 생략
+        return false
     }
 
     override fun hashCode(): Int {
         var result = major
-        result = 31 * result + minor
-        result = 31 * result + patch
-        result = 31 * result + (preRelease?.hashCode() ?: 0)
-        result = 31 * result + (build?.hashCode() ?: 0)
+        // 생략
         return result
     }
 
@@ -272,10 +214,7 @@ class SemanticVersion : Comparable<SemanticVersion> {
      */
     override fun toString(): String {
         var rv = "$major.$minor.$patch"
-        if (null != preRelease)
-            rv = "$rv-$preRelease"
-        if (null != build)
-            rv = "$rv+$build"
+        // 생략
         return rv
     }
 }
