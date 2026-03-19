@@ -125,35 +125,35 @@
 
 - **[Compilers: Principles, Techniques, and Tools](https://en.wikipedia.org/wiki/Compilers:_Principles,_Techniques,_and_Tools)** — Alfred V. Aho, Ravi Sethi, Jeffrey D. Ullman (Addison-Wesley, 1986)
   - 흔히 "Dragon Book"으로 불리는 컴파일러 교재. 1970년대 후반 PQCC(Production Quality Compiler-Compiler) 프로젝트에서 정립된 원칙을 바탕으로 front-end(소스 분석, 중간 표현 생성)와 back-end(목적 코드 생성)의 구분을 표준화했다. 이것이 frontend/backend라는 용어의 원형이다.
-  - > "The Production Quality Compiler-Compiler (PQCC), in the late 1970s, introduced the principles of compiler organization that are still widely used today (e.g., a front-end handling syntax and semantics and a back-end generating machine code)."
-  - > "Limited memory capacity of early computers led to substantial technical challenges when the first compilers were designed, requiring the compilation process to be divided into several small programs, with front end programs producing analysis products used by back end programs to generate target code."
+  - > The Production Quality Compiler-Compiler (PQCC), in the late 1970s, introduced the principles of compiler organization that are still widely used today (e.g., a front-end handling syntax and semantics and a back-end generating machine code).
+  - > Limited memory capacity of early computers led to substantial technical challenges when the first compilers were designed, requiring the compilation process to be divided into several small programs, with front end programs producing analysis products used by back end programs to generate target code.
 
 - **[Front end and back end - Wikipedia](https://en.wikipedia.org/wiki/Front_end_and_back_end)**
-  - > "Terms like 'front-end' and 'back-end' had already been used in large enterprise systems, where the front-end would be what people saw on their terminal and the back-end was basically the mainframe itself."
+  - > Terms like 'front-end' and 'back-end' had already been used in large enterprise systems, where the front-end would be what people saw on their terminal and the back-end was basically the mainframe itself.
   - 단, 이 인용이 특정 1차 문헌에서 나온 것인지는 확인되지 않은 2차 자료다.
 
 ### 웹의 클라이언트-서버 모델 확립
 
 - **[RFC 1945 – Hypertext Transfer Protocol HTTP/1.0](https://datatracker.ietf.org/doc/html/rfc1945)** — Tim Berners-Lee, Roy T. Fielding, Henrik Frystyk (IETF, 1996)
   - HTTP 표준에서 client와 server를 공식 정의한 문서. 웹 개발에서 frontend=브라우저(클라이언트), backend=웹 서버라는 등식이 이 시기에 굳어지기 시작했다. RFC 자체는 "frontend/backend"라는 단어를 쓰지 않고 "client/server"를 사용한다.
-  - > **Client:** "An application program that establishes connections for the purpose of sending requests."
-  - > **Server:** "An application program that accepts connections in order to service requests by sending back responses."
+  - > **Client:** An application program that establishes connections for the purpose of sending requests.
+  - > **Server:** An application program that accepts connections in order to service requests by sending back responses.
 
 - **[Presentation Domain Data Layering](https://martinfowler.com/bliki/PresentationDomainDataLayering.html)** — Martin Fowler (2015)
   - 프레젠테이션-도메인-데이터의 3계층 분리를 설명하면서, 이것이 물리적 배포 계층(tier)과 다른 논리적 계층(layer)임을 강조한다. 클라이언트/서버 경계와 frontend/backend 경계가 반드시 일치하지 않음을 시사한다.
-  - > "These layers are **logical layers not physical tiers.** A developer can run all three layers on a laptop, run the presentation and domain model in a desktop with a database on a server, or split the presentation with a rich client in the browser and a Backend For Frontend on the server."
-  - > "Developers don't have to be full-stack but teams should be."
+  - > These layers are **logical layers not physical tiers.** A developer can run all three layers on a laptop, run the presentation and domain model in a desktop with a database on a server, or split the presentation with a rich client in the browser and a Backend For Frontend on the server.
+  - > Developers don't have to be full-stack but teams should be.
 
 ### 경계의 재정의: JAMstack과 BFF 패턴
 
 - **[The Evolution Of Jamstack](https://www.smashingmagazine.com/2021/05/evolution-jamstack/)** — Smashing Magazine (2021)
   - 2015년 Netlify CEO Mathias Biilmann이 만든 JAMstack 개념을 설명. frontend를 UI/정적 자산 계층으로, backend를 API/데이터 계층으로 명확히 재분리했다. 인터넷 시대에 클라이언트=frontend로 뭉뚱그려진 것을 다시 UI 영역으로 좁힌 흐름이다.
-  - > "Unlike the large legacy apps, Jamstack projects neatly separate the frontend pages and UI from the backend apps and databases. Freed from backend servers, the frontend can then be deployed globally, directly to a CDN."
-  - > "Decoupling the frontend from back-end services and platforms enforces a clear contract for how your UI communicates with the rest of the system."
+  - > Unlike the large legacy apps, Jamstack projects neatly separate the frontend pages and UI from the backend apps and databases. Freed from backend servers, the frontend can then be deployed globally, directly to a CDN.
+  - > Decoupling the frontend from back-end services and platforms enforces a clear contract for how your UI communicates with the rest of the system.
 
 - **[The Back-end for Front-end Pattern (BFF)](https://philcalcado.com/2015/09/18/the_back_end_for_front_end_pattern_bff.html)** — Phil Calçado (2015, SoundCloud 경험 기반)
   - BFF 패턴은 frontend를 단순히 "브라우저"가 아닌 "특정 UI 경험(iOS, Android, Web 등)에 종속된 전체 스택"으로 개념을 확장했다.
-  - > "At this stage we realised that the BFF wasn't an API *used* by the application. **The BFF was part of the application.**"
+  - > At this stage we realised that the BFF wasn't an API *used* by the application. **The BFF was part of the application.**
 
 - **[Backends For Frontends](https://samnewman.io/patterns/architectural/bff/)** — Sam Newman
   - BFF 패턴의 아키텍처적 근거와 적용 방식을 체계적으로 정리한 문서.
@@ -164,16 +164,16 @@
 
 - **[Dividing frontend from backend is an antipattern](https://www.thoughtworks.com/en-us/insights/blog/dividing-frontend-backend-antipattern)** — ThoughtWorks (2018)
   - 현대 프론트엔드 개발의 복잡도가 백엔드와 동일한 수준으로 높아졌으며, frontend/backend를 직군으로 분리하는 것이 오히려 해롭다는 주장. 역설적으로, 이 주장 자체가 frontend의 기술적 영역이 넓어졌음을 전제로 한다.
-  - > "Frontend engineers now solve the same kinds of problems as their backend counterparts, using the same kinds of solutions, and it is harmful to continue arbitrarily dividing us."
-  - > "Contemporary frontend work has evolved in complexity to the extent that we should no longer separate frontend from backend roles."
-  - > "Testability, maintainability, persistence, asynchronicity, state, and API design [are] the daily work of client-side developers."
+  - > Frontend engineers now solve the same kinds of problems as their backend counterparts, using the same kinds of solutions, and it is harmful to continue arbitrarily dividing us.
+  - > Contemporary frontend work has evolved in complexity to the extent that we should no longer separate frontend from backend roles.
+  - > Testability, maintainability, persistence, asynchronicity, state, and API design [are] the daily work of client-side developers.
 
 ### 코드 수준의 경계 재정의: React Server Components
 
 - **[Understanding React Server Components](https://vercel.com/blog/understanding-react-server-components)** — Vercel (2023)
   - React Server Components(RSC)는 코드 수준에서 `"use client"` / `"use server"` 지시어로 frontend와 backend의 경계를 브라우저/서버가 아닌 **인터랙티비티 여부**로 재정의했다.
-  - > "The server, far more powerful and physically closer to your data sources, deals with compute-intensive rendering and ships to the client just the interactive pieces of code."
+  - > The server, far more powerful and physically closer to your data sources, deals with compute-intensive rendering and ships to the client just the interactive pieces of code.
 
 - **[Server and Client Components](https://nextjs.org/docs/app/getting-started/server-and-client-components)** — Next.js 공식 문서 (2026)
-  - > "Use **Server Components** when you need: Fetch data from databases or APIs close to the source. Use API keys, tokens, and other secrets without exposing them to the client."
-  - > "Use **Client Components** when you need: State and event handlers... Browser-only APIs..."
+  - > Use **Server Components** when you need: Fetch data from databases or APIs close to the source. Use API keys, tokens, and other secrets without exposing them to the client.
+  - > Use **Client Components** when you need: State and event handlers... Browser-only APIs...
