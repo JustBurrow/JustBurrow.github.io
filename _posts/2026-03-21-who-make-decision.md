@@ -86,3 +86,36 @@ contents: # 다룰 내용, 입장, 정의 등. 순서는 중요도나 논리적 
 - **데이터 스키마 설계·진화**: 전체 서비스의 도메인 모델을 정의하고, 비즈니스 변화에 맞게 스키마를 안전하게 발전시키는 능력.
 - **API 계약 기술 활용(언어 + 컴파일러)**: protobuf·GraphQL 스키마 같은 API 정의 언어로 서버-클라이언트 간 계약을 명시화하고, 컴파일러로 양쪽 코드를 자동 생성한다. 이를 통해 네트워크 통신을 클라이언트 라이브러리 뒤에 캡슐화하여 클라이언트 개발자가 네트워크를 직접 다루지 않고 타입이 보장된 메서드 호출로 데이터에 접근하게 한다.
 - **멀티플랫폼 라이브러리 개발**: iOS·Android·웹에서 동시에 실행되는 클라이언트 라이브러리를 작성하는 능력. 로컬 캐싱, 로깅, 백그라운드 작업, 플랫폼(OS) 기능을 캡슐화한 API 확장이나 플랫폼 독립적인 유틸리티 라이브러리를 포함한다.
+
+## 참고 자료
+
+### GUI 아키텍처 패턴: MVC·MVP·MVVM
+
+- **[GUI Architectures](https://martinfowler.com/eaaDev/uiArchs.html)** — Martin Fowler (2006)
+  - MVC, MVP, Presentation Model(MVVM의 전신) 등 주요 GUI 아키텍처 패턴을 비교·설명한 글. MVVM에서 ViewModel이 반응형 상태를 메모리에 유지하고 뷰가 이를 구독하는 구조의 기원을 이해하는 데 필요한 배경이다.
+  - > Model-View-Presenter was created at Taligent in the early 1990s and described by Mike Potel.
+
+- **[Guide to app architecture](https://developer.android.com/topic/architecture)** — Android Developers 공식 문서
+  - Android에서 권장하는 MVVM 기반 아키텍처를 설명한다. UI 레이어(ViewModel + UI), 도메인 레이어(UseCase), 데이터 레이어(Repository)로 구성하며 데이터 레이어가 Model에 해당한다. StateFlow·LiveData 같은 observable data holder의 사용과 단방향 데이터 흐름(UDF) 패턴을 구체화한다.
+
+### 레포지토리 패턴
+
+- **[Repository - Catalog of Patterns of Enterprise Application Architecture](https://martinfowler.com/eaaCatalog/repository.html)** — Martin Fowler (PoEAA, 2003)
+  - 도메인 레이어와 데이터 매핑 레이어 사이를 중재하는 Repository 패턴을 정의한다. 클라이언트 관점에서 데이터 접근의 구체적인 구현(네트워크, 로컬 스토리지, 캐시)을 추상화하는 인터페이스로, MVVM의 Model 경계가 서버와 클라이언트 간 계약이 되는 구조의 근거다.
+  - > A Repository mediates between the domain and data mapping layers, acting like an in-memory domain object collection.
+
+### API 정의 언어와 컴파일러
+
+- **[Protocol Buffers Documentation](https://protobuf.dev/)** — Google
+  - gRPC의 인터페이스 정의 언어(IDL)이자 직렬화 포맷. `.proto` 파일로 API 계약을 정의하면 서버·클라이언트 양쪽의 코드를 자동 생성(`protoc`)할 수 있다.
+
+- **[gRPC Documentation](https://grpc.io/docs/)** — gRPC 공식 문서
+  - Protocol Buffers를 IDL로 사용하는 RPC 프레임워크. 코드 생성이 기본 내장돼 있어 서버 개발자가 정의한 서비스 명세에서 클라이언트 스텁을 자동으로 생성한다.
+
+- **[GraphQL Specification](https://spec.graphql.org/)** — GraphQL Foundation
+  - 스키마로 API 계약을 명시화하는 쿼리 언어. 스키마에서 클라이언트 코드를 자동 생성하려면 Apollo Codegen·graphql-codegen 같은 별도 도구가 필요하다(gRPC와 달리 코드 생성은 기본 내장이 아니다).
+
+### 멀티플랫폼 프로그래밍
+
+- **[Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatform.html)** — Kotlin 공식 문서
+  - 비즈니스 로직을 Kotlin으로 한 번 작성하고 Android, iOS, 데스크탑, 웹(Wasm/JS)에서 공유하는 기술. 공유 코드는 각 플랫폼 네이티브로 컴파일되며, UI는 각 플랫폼 프레임워크를 그대로 사용한다. 서버 개발자가 작성한 도메인 모델·Repository 구현을 클라이언트 라이브러리로 배포하는 경로를 제공한다.
