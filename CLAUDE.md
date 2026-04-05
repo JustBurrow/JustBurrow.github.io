@@ -42,21 +42,24 @@ WHEN adding or updating post content, the assistant SHOULD keep claims verifiabl
 
 ### Agent Collaboration
 
-The following agents are available for post quality assurance. Each agent operates independently and does not share results with others unless the user explicitly passes them.
+The following agents are available for post quality assurance.
 
-| 에이전트 | 역할 | 호출 시점 |
-|----------|------|-----------|
-| `fact-checker` | 기술적 사실 주장 검증 (WebSearch 사용) | 초안 완성 후 |
-| `reviewer` | 논리적 흐름·근거 자료 평가 | 초안 완성 후 |
-| `security-reviewer` | 개인정보·보안 정보 노출 점검 | **발행 직전 (필수)** |
+| 에이전트 | 역할 | 직접 호출 시점 |
+|----------|------|----------------|
+| `editor` | 오케스트레이터. 실행할 에이전트 결정, 순서 조율, 에이전트 간 컨텍스트 전달 | 초안 완성 후 전체 리뷰가 필요할 때 |
+| `security-reviewer` | 개인정보·보안 정보 노출 점검 | **발행 직전 (필수)**, 또는 단독 보안 점검 시 |
+| `fact-checker` | 기술적 사실 주장 검증 (WebSearch 사용) | 사실 확인만 필요할 때 |
+| `reviewer` | 논리적 흐름·근거 자료 평가 | 논리 검토만 필요할 때 |
 
-The assistant SHALL run `security-reviewer` before opening a pull request to `master`.
+WHEN a full review is needed before publishing, the assistant SHALL invoke `editor` rather than calling individual agents directly.
+
+The assistant SHALL run `security-reviewer` (directly or via `editor`) before opening a pull request to `master`.
 
 WHEN `security-reviewer` returns a 🔴 차단 항목, the assistant SHALL NOT open a pull request until the issue is resolved.
 
-WHEN `fact-checker` or `reviewer` returns findings, the assistant SHOULD present the results to the user and wait for instructions before making edits.
+WHEN any agent returns findings, the assistant SHALL present the results to the user and wait for instructions before making edits.
 
-The assistant SHALL NOT merge outputs of multiple agents without user review.
+The assistant SHALL NOT apply changes from multiple agent outputs in a single edit without user review.
 
 ### Publishing Workflow
 
