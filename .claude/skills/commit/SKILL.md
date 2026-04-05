@@ -3,15 +3,15 @@ name: commit
 description: 변경사항을 성격에 따라 분류해 원자적 커밋으로 나눠 커밋한다. gitmoji + 한줄 요약 + 자세한 내용 형식 사용.
 ---
 
-## Requirements
+## 요구사항
 
 ### 분석
 
-The skill SHALL inspect all changes (staged and unstaged) using `git status` and `git diff HEAD` before classifying.
+스킬은 반드시 분류를 시작하기 전에 `git status`와 `git diff HEAD`로 모든 변경사항(스테이지 여부 무관)을 파악해야 한다.
 
-The skill SHALL classify each changed file into exactly one commit type from the table below.
+스킬은 반드시 변경된 파일 각각을 아래 커밋 유형 중 하나로 분류해야 한다.
 
-WHEN files of the same type belong to different features or concerns, the skill SHALL split them into separate commits.
+같은 유형의 파일이라도 서로 다른 기능이나 관심사에 해당하는 경우, 스킬은 반드시 별도의 커밋으로 분리해야 한다.
 
 ### 커밋 유형
 
@@ -33,19 +33,19 @@ WHEN files of the same type belong to different features or concerns, the skill 
 | 콘텐츠 | 🖊️ | 블로그 포스트 등 콘텐츠 추가·수정 |
 | 기타 | 🔨 | 위 유형에 해당하지 않는 변경 |
 
-The skill SHOULD consult [gitmoji][1] for emoji not listed above.
+위 목록에 없는 이모지가 필요한 경우, 스킬은 [gitmoji][1]를 참조하는 것이 좋다.
 
 ### 사용자 확인
 
-The skill SHALL present the proposed commit plan to the user and wait for confirmation before executing any commit.
+스킬은 반드시 커밋을 실행하기 전에 예정 커밋 계획을 사용자에게 제시하고 확인을 기다려야 한다.
 
 ### 커밋 실행
 
-The skill SHALL stage files by explicit path; the skill SHALL NOT use `git add -A` or `git add .`.
+스킬은 반드시 파일을 명시적 경로로 스테이징해야 한다. `git add -A` 또는 `git add .`를 사용해서는 안 된다.
 
-The skill SHALL NOT use the `--no-verify` flag.
+스킬은 `--no-verify` 플래그를 사용해서는 안 된다.
 
-The skill SHALL commit using the following message format:
+스킬은 반드시 다음 형식으로 커밋 메시지를 작성해야 한다:
 
 ```
 {gitmoji} {한줄 요약}
@@ -58,11 +58,11 @@ The skill SHALL commit using the following message format:
 
 ### 예외
 
-IF a file appears to contain secrets (`.env`, credentials, tokens), the skill SHALL exclude it from all commits and notify the user.
+시크릿이 포함된 것으로 보이는 파일(`.env`, 자격증명, 토큰)이 있는 경우, 스킬은 반드시 해당 파일을 모든 커밋에서 제외하고 사용자에게 알려야 한다.
 
-IF a file is a large binary unrelated to content (e.g., not a diagram export under `assets/`), the skill SHOULD warn the user before including it.
+콘텐츠와 무관한 대용량 바이너리 파일(예: `assets/` 외부의 다이어그램 내보내기가 아닌 파일)이 있는 경우, 스킬은 해당 파일을 포함하기 전에 사용자에게 경고하는 것이 좋다.
 
-## 참고
+## 참고 자료
 
 1. [gitmoji | An emoji guide for your commit messages][1]
 
