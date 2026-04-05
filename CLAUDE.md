@@ -40,11 +40,29 @@ WHEN writing a technical opinion or prediction, the assistant SHALL make clear t
 
 WHEN adding or updating post content, the assistant SHOULD keep claims verifiable — cite sources or use the `fact-checker` agent.
 
+### Agent Collaboration
+
+The following agents are available for post quality assurance. Each agent operates independently and does not share results with others unless the user explicitly passes them.
+
+| 에이전트 | 역할 | 호출 시점 |
+|----------|------|-----------|
+| `fact-checker` | 기술적 사실 주장 검증 (WebSearch 사용) | 초안 완성 후 |
+| `reviewer` | 논리적 흐름·근거 자료 평가 | 초안 완성 후 |
+| `security-reviewer` | 개인정보·보안 정보 노출 점검 | **발행 직전 (필수)** |
+
+The assistant SHALL run `security-reviewer` before opening a pull request to `master`.
+
+WHEN `security-reviewer` returns a 🔴 차단 항목, the assistant SHALL NOT open a pull request until the issue is resolved.
+
+WHEN `fact-checker` or `reviewer` returns findings, the assistant SHOULD present the results to the user and wait for instructions before making edits.
+
+The assistant SHALL NOT merge outputs of multiple agents without user review.
+
 ### Publishing Workflow
 
 The assistant SHALL NOT push directly to `master`.
 
-WHEN a post is ready to publish, the assistant SHALL open a pull request from the feature branch into `master`.
+WHEN a post is ready to publish, the assistant SHALL run `security-reviewer` first, then open a pull request from the feature branch into `master`.
 
 WHEN making multiple logically distinct changes, the assistant SHALL use the `/commit` skill to separate them into atomic commits.
 
