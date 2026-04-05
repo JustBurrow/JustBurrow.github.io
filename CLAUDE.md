@@ -50,6 +50,7 @@ title: "포스트 제목"
 | `security-reviewer` | 개인정보·보안 정보 노출 점검 |
 | `fact-checker` | 기술적 사실 주장 검증 |
 | `reviewer` | 논리적 흐름·근거 자료 평가 |
+| `consultant` | Claude Code 설정 개선 제안 (git 로그·커밋·설정 파일 분석) |
 
 ### 발행 워크플로우
 
