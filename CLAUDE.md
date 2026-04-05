@@ -36,7 +36,11 @@ Posts are published by merging feature branches into `master`. GitHub Pages buil
 1. [GitHub Pages 문서 - GitHub 문서][1]
 2. [Jekyll • Simple, blog-aware, static sites | Transform your plain text into static websites and blogs][2]
 3. [Bundler: The best way to manage a Ruby application's gems][3]
+4. [Alistair Mavin EARS: Easy Approach to Requirements Syntax | Official Guide][4]
+5. [RFC 2119 - Key words for use in RFCs to Indicate Requirement Levels][5]
 
 [1]: https://docs.github.com/pages
 [2]: https://jekyllrb.com
 [3]: https://bundler.io
+[4]: https://alistairmavin.com/ears/
+[5]: https://datatracker.ietf.org/doc/html/rfc2119
