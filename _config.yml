@@ -10,3 +10,7 @@ github_username: JustBurrow
 markdown: kramdown
 kramdown:
   input: GFM
+
+exclude:
+  - CLAUDE.md
+  - .claude/
