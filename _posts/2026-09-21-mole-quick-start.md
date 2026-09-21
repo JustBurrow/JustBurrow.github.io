@@ -383,7 +383,27 @@ object Libs {
 
 버전을 올릴 때는 공용 그룹 아티팩트 한 번, 저장소는 `mole.toml`의 `module-libs` 버전 한 줄만 바꾼다. `--why`는 그 아티팩트가 어느 `Group` 선언에서 왔는지 소스 위치까지 보여 준다.
 
-카탈로그는 이것 하나다. TOML 같은 별도 형식은 두지 않는다. 컴파일 단계 코드가 이미 Kotlin이므로 카탈로그도 같은 언어·같은 컴파일 단위에 두면 IDE 자동완성·리팩터링·참조 찾기가 그대로 통하고, 형식이 하나 줄어든다. Gradle에서 옮겨올 때는 `libs.versions.toml`을 `Libs.kt`로 한 번 변환한다.
+기본은 이렇게 **Kotlin 코드(`*.kt`)** 다. 컴파일 단계 코드가 이미 Kotlin이므로 카탈로그도 같은 언어·같은 컴파일 단위에 두면 IDE 자동완성·리팩터링·참조 찾기가 그대로 통하고, `Group` 같은 타입도 쓸 수 있다.
+
+**TOML은 옵션**으로 허용한다. Gradle에서 옮겨오는 중이거나, 봇(Renovate/Dependabot)이 버전을 올려 주길 원하는 저장소를 위한 것이다. `mole.toml`에 한 줄 적으면 된다.
+
+```toml
+[catalog]
+toml = ["gradle/libs.versions.toml"]      # 여러 개 가능
+```
+
+엔진이 각 파일을 `build/generated/module/<이름>Toml.kt`로 변환해 컴파일 단계 단위에 합친다. `libs.versions.toml`이면 `object LibsToml`이 되고, `[versions]`·`[libraries]`·`[bundles]`·`[plugins]`가 각각 `v`·최상위 프로퍼티·`bundles`·`plugins`로 대응된다. 생성된 객체는 `Libs.kt`와 같은 타입(`Artifact`, `Group`)을 쓰므로 두 방식을 섞어도 된다.
+
+```kotlin
+// Libs.kt — 직접 쓴 것과 TOML에서 온 것을 한곳에 모아 노출
+object Libs {
+    val spring = Group("org.springframework.boot", "4.0.2")
+    val web    = spring("spring-boot-starter-web")
+    val junit  = LibsToml.junit_jupiter                          // gradle/libs.versions.toml의 [libraries] junit-jupiter
+}
+```
+
+생성 코드는 읽기 전용이고 `--model`에 출처(`catalog: gradle/libs.versions.toml`)가 표시된다. TOML만 쓰는 저장소도 `Libs.kt` 없이 `LibsToml`을 바로 import 하면 된다.
 
 ### 컴파일 단위와 순서
 
@@ -573,7 +593,7 @@ Fs.fingerprint(paths)                                                         //
 | `settings.gradle.kts` + wrapper            | `mole.toml` + `mole`                     |
 | `include(":a:b")`                          | 없음. `Module.kt`가 있는 디렉터리가 모듈 |
 | `project(":a:b")`                          | `a.b.Module` (import)                    |
-| `libs.versions.toml`                       | `Libs.kt`                                |
+| `libs.versions.toml`                       | `Libs.kt` (기본) 또는 TOML 가져오기 (옵션) |
 | `kotlin { jvm(); linuxX64() }`             | `targets { jvm(); linuxX64() }`          |
 | `sourceSets.jvmMain.dependencies { }`      | `sourceSets { jvmMain { } }`             |
 | 플러그인                                   | 타깃 확장(A) 또는 `Tasks.kt`(B)          |
@@ -770,7 +790,7 @@ steps:
 | R5  | 컴파일 단계와 자동화 단계 분리                                  | 단계 A / B, 다른 파일                                           |
 | R6  | 자동화 코드가 `main`/`test`를 직접 호출                         | `mole → jvmTest → jvmMain → commonMain`                         |
 | R7  | 의존성: jar 경로 / Maven·Gradle 아티팩트 / `"g:n:v"` / 인스턴스 | `Dependency` 계층                                               |
-| R8  | 버전 카탈로그                                                   | `Libs.kt` (Kotlin 코드 하나로 통합)                             |
+| R8  | 버전 카탈로그                                                   | `Libs.kt` 기본, `libs.versions.toml` 가져오기는 옵션            |
 | R9  | Maven/Gradle 사용자에게 익숙한 구조                             | 모듈 루트 `Module.kt`, KMP 소스셋 관례, 관례 태스크             |
 | R10 | 디렉터리 구조 = 모듈 구조. import로 모듈 간 의존 표현           | `Module.kt`가 있는 디렉터리 = 모듈, `api(server.common.Module)` |
 | R11 | IntelliJ가 자동화 코드를 직접 실행·디버그                       | `@JvmStatic main` + `./mole idea`                               |
