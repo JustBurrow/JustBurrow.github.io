@@ -19,5 +19,6 @@
       "Bash(git restore:*)",
       "Bash(rm -rf:*)"
     ]
-  }
+  },
+  "model": "opus"
 }
