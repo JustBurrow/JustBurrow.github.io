@@ -51,25 +51,25 @@ flowchart TB
 
 세 가지 프로젝트 형태가 모두 정상이다.
 
-| 형태          | 파일                            | 예                                                                  |
-|---------------|---------------------------------|---------------------------------------------------------------------|
-| 빌드 + 자동화 | `Module.kt` + `Tasks.kt`        | 서비스 저장소. 컴파일·테스트는 관례, DB 준비·배포·보고는 `Tasks.kt` |
-| 빌드만        | `Module.kt`                     | 라이브러리 저장소. `./mole build`, `./mole test`로 충분             |
-| 자동화만      | `Tasks.kt` (+ 최소 `Module.kt`) | 운영 자동화, 인프라 작업, 데이터 파이프라인                         |
+| 형태          | 파일                                    | 예                                                                  |
+|---------------|-----------------------------------------|---------------------------------------------------------------------|
+| 빌드 + 자동화 | `Project.kt` + `Module.kt` + `Tasks.kt` | 서비스 저장소. 컴파일·테스트는 관례, DB 준비·배포·보고는 `Tasks.kt` |
+| 빌드만        | `Project.kt` + `Module.kt`              | 라이브러리 저장소. `./mole build`, `./mole test`로 충분             |
+| 자동화만      | `Project.kt` + `Tasks.kt`               | 운영 자동화, 인프라 작업, 데이터 파이프라인. `Module.kt` 없음       |
 
 ### 두 단계
 
 빌드 시스템을 쓰는 프로젝트에서 실행은 두 단계로 나뉜다. 자동화만 쓰는 프로젝트는 B만 있다.
 
-|             | A. 컴파일 단계                                              | B. 자동화 단계                                                                     |
-|-------------|-------------------------------------------------------------|------------------------------------------------------------------------------------|
-| 코드 위치   | **모듈 루트의 `*.kt`** (`Module.kt`, `Libs.kt`)             | `src/mole/kotlin` 소스셋                                                           |
-| import 가능 | 엔진 코어 + 활성 확장의 `module` API + 다른 모듈의 `Module` | `jvmTest` + `jvmMain` + `commonMain` + 자기·의존 모듈의 `Module` + 엔진 `task` API |
-| 정하는 것   | 타깃, 소스셋별 의존성, 컴파일러 옵션, KSP/APT, 생성 소스    | 태스크 트리 (관례 태스크의 참조·재정의·확장)                                       |
-| 확장 방식   | 타깃 확장만 (엔진과 함께 배포)                              | 일반 코드                                                                          |
-| 실행 환경   | JVM                                                         | JVM. native/js 산출물은 프로세스로 실행                                            |
+|             | A. 컴파일 단계                                                                          | B. 자동화 단계                                                                                      |
+|-------------|-----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
+| 코드 위치   | **루트의 `Project.kt`·`Libs.kt`, 루트 `src/mole`, 각 모듈 루트의 `*.kt`** (`Module.kt`) | 각 모듈의 `src/mole/kotlin` 소스셋 (루트 `src/mole`은 A에서 컴파일되고 B에서 실행)                  |
+| import 가능 | 엔진 코어 + 활성 확장의 `module` API + `Project` + 루트 `src/mole` + 다른 모듈의 `Module` | `jvmTest` + `jvmMain` + `commonMain` + 자기·의존 모듈의 `Module` + 루트 `src/mole` + 엔진 `task` API |
+| 정하는 것   | 버전 카탈로그, 저장소 공용 프리셋, 타깃, 소스셋별 의존성, 컴파일러 옵션, KSP/APT, 생성 소스 | 태스크 트리 (관례 태스크의 참조·재정의·확장)                                                        |
+| 확장 방식   | 타깃 확장 (엔진과 함께 배포) + 루트 `src/mole` (저장소 로컬)                            | 일반 코드                                                                                           |
+| 실행 환경   | JVM                                                                                     | JVM. native/js 산출물은 프로세스로 실행                                                             |
 
-A는 Gradle이 관례로 해주던 것의 최소 집합이고, B는 플러그인·태스크로 하던 것 전부다. A에는 타깃 확장 외의 확장점이 없다.
+A는 Gradle이 관례로 해주던 것의 최소 집합이고, B는 플러그인·태스크로 하던 것 전부다. A의 확장점은 타깃 확장과 루트 `src/mole` 둘뿐이다. 루트 `src/mole`은 어떤 `Module.kt`보다 먼저 컴파일되어 `Module.kt`가 import 할 수 있는 유일한 저장소 코드다 (Gradle의 `buildSrc`에 대응).
 
 ### 되먹임 — A는 B를 라이브러리로 굳힌 것
 
@@ -80,10 +80,11 @@ A는 Gradle이 관례로 해주던 것의 최소 집합이고, B는 플러그인
 | 경로                                                                                 | 허용                | 이유                                                                                                |
 |--------------------------------------------------------------------------------------|---------------------|-----------------------------------------------------------------------------------------------------|
 | 저장소 X의 `src/mole` → 배포(`kr.lul.mole:kmp-build:0.5.0`) → 저장소 Y의 `mole.toml` | ○                   | 엔진·확장·KMP 빌드 시스템이 만들어지는 정상 경로. `kmp-build` 자체가 이 경로로 배포된 B 단계 코드다 |
-| 같은 저장소 안에서 자기 `src/mole` 산출물을 자기 `Module.kt`가 참조                  | **×** (엔진이 거부) | 한 Run 안의 순환. A가 B보다 먼저 끝나야 한다는 전제가 깨짐                                          |
+| 루트 `src/mole` → 같은 저장소의 각 `Module.kt`                                       | ○                   | 저장소 로컬 프리셋 (Gradle `buildSrc`). 루트 `src/mole`은 엔진과 `Project`만 보고 어떤 `Module`·프로젝트 소스도 못 보므로 순환이 없다 |
+| 모듈의 `src/mole` 산출물을 같은 저장소의 `Module.kt`가 참조                          | **×** (엔진이 거부) | 한 Run 안의 순환. 모듈 `src/mole`은 소스셋 컴파일 뒤에 오므로 A가 B보다 먼저 끝나야 한다는 전제가 깨짐 |
 | 같은 저장소의 이전 빌드 산출물을 `jar()`로 A에 넣기                                  | ×                   | "지금 코드"와 "굳힌 코드"가 한 저장소에 공존해 어느 쪽이 진실인지 헷갈림                            |
 
-권장하지 않는 이유는 기술이 아니라 인지 부담이다. 한 저장소 안에서 같은 코드가 "실행되는 태스크"이면서 "컴파일을 정하는 라이브러리"이면, 실패 원인을 A/B로 가르는 첫 분류 (R1)가 무너진다. 프리셋을 공유하고 싶으면 별도 저장소로 분리해 버전을 붙여 배포한다.
+권장하지 않는 이유는 기술이 아니라 인지 부담이다. 한 저장소 안에서 같은 코드가 "실행되는 태스크"이면서 "컴파일을 정하는 라이브러리"이면, 실패 원인을 A/B로 가르는 첫 분류 (R1)가 무너진다. 저장소 안에서 공유하는 프리셋은 루트 `src/mole`에 두고, 저장소 밖으로 공유하는 프리셋은 별도 저장소로 분리해 버전을 붙여 배포한다.
 
 ## 설치
 
@@ -95,9 +96,9 @@ curl -fsSL https://mole.lul.kr/init.sh | bash
 ```text
 mole  mole.cmd                # 부트스트랩 (모든 프로젝트 동일)
 mole.toml                     # 엔진 버전·확장·저장소 (데이터. 순환을 끊는 유일한 파일)
-Module.kt                     # 루트 모듈 정의
-Libs.kt                       # 버전 카탈로그
-src/mole/kotlin/Tasks.kt      # 루트 자동화 (선택)
+Project.kt                    # 저장소 정의. 버전 카탈로그 인스턴스 (Project.versionCatalog)
+Libs.kt                       # 카탈로그 위에 얹는 별칭 (선택)
+src/mole/kotlin/              # 저장소 공용 코드 + 루트 자동화 (선택)
 ```
 
 ```toml
@@ -111,19 +112,20 @@ extensions = ["jvm", "native", "js", "sys"]   # 타깃 확장 + 기본 확장. �
 maven = ["https://repo.maven.apache.org/maven2", "https://repo.lul.kr/maven-public"]
 local = true                                  # ~/.m2
 
-[module-libs]                                 # Module.kt가 import 할 수 있는 확장 라이브러리
+[module-libs]                                 # Project.kt·Module.kt가 import 할 수 있는 확장 라이브러리
 libs = ["kr.lul.mole:kmp-build:0.5.0"]
 ```
 
 Gradle 대응: `mole.toml` ≈ `gradle-wrapper.properties` + `settings.gradle.kts`의 `pluginManagement`. 모듈 목록 (`include`)은 없다. 디렉터리가 곧 모듈이다.
 
-자동화만 쓰는 프로젝트는 `extensions = []`로 두고 `Module.kt`를 최소로 쓴다.
+자동화만 쓰는 프로젝트는 `extensions = []`로 두고 `Module.kt` 없이 `Project.kt`와 `Tasks.kt`만 둔다.
 
 ```kotlin
-// Module.kt — 자동화 전용 프로젝트
-object Module : AutomationModule() {
-    override val sourceSets = sourceSets {
-        mole { implementation(Libs.tcPostgres); implementation("software.amazon.awssdk:s3:2.32.0") }
+// Project.kt — 자동화 전용 프로젝트
+object Project : mole.module.Project() {
+    override val mole = dependencies {                                     // 루트 src/mole 의존성
+        implementation("org.testcontainers:postgresql:1.21.3")
+        implementation("software.amazon.awssdk:s3:2.32.0")
     }
 }
 ```
@@ -142,15 +144,17 @@ object Tasks : RootTasks() {
 }
 ```
 
-`./mole nightly`. A 단계는 `Module.kt` 로드만 하고 컴파일할 것이 없어 바로 B로 넘어간다. 요구사항은 JDK 21+.
+`./mole nightly`. A 단계는 `Project.kt`와 루트 `src/mole`을 컴파일하고, 모듈이 없으니 바로 B로 넘어간다. 요구사항은 JDK 21+.
 
 ## 프로젝트 구조
 
 ```text
-my-project/                          ← 루트 모듈 (object Module, 기본 패키지)
+my-project/                          ← 루트 (object Project, 기본 패키지. 모듈이 아님)
   mole  mole.toml
-  Module.kt  Libs.kt                 ← A. 루트 모듈 정의 + 카탈로그
-  src/mole/kotlin/Tasks.kt           ← B. 루트 자동화
+  Project.kt  Libs.kt                ← A. 저장소 정의 + 카탈로그
+  src/mole/kotlin/                   ← A에서 컴파일, B에서 실행. 모든 Module.kt가 import
+    Presets.kt                       ←   저장소 공용 프리셋
+    Tasks.kt                         ←   루트 자동화
   server/                            ← 그룹 (object Module 없음)
     common/                          ← 모듈 server/common, 패키지 server.common
       Module.kt                      ← A
@@ -176,20 +180,27 @@ my-project/                          ← 루트 모듈 (object Module, 기본 �
 
 규칙:
 
-- **루트의 `mole` 스크립트 기준 상대 경로를 패키지로 갖고, `Module` 타입을 상속한 `object Module`이 있으면 그 디렉터리가 모듈**이다. 세 조건이 전부 맞아야 한다: ① 이름이 `Module`인 `object`, ② 패키지 = 상대 경로, ③ 엔진의 `mole.module.Module`(또는 그 하위 `KmpModule`/`JvmModule`/`AutomationModule`…)을 상속. `server/domain/`은 `package server.domain`의 `object Module : KmpModule()`이 있을 때 모듈이 되고, 루트는 기본 패키지의 `object Module`이다. 조건이 맞는 객체가 없는 디렉터리는 그룹 (경로만 제공). `src/` 유무는 무관하다.
+- **루트의 `mole` 스크립트 기준 상대 경로를 패키지로 갖고, `Module` 타입을 상속한 `object Module`이 있으면 그 디렉터리가 모듈**이다. 세 조건이 전부 맞아야 한다: ① 이름이 `Module`인 `object`, ② 패키지 = 상대 경로, ③ 엔진의 `mole.module.Module`(또는 그 하위 `KmpModule`/`JvmModule`…)을 상속. `server/domain/`은 `package server.domain`의 `object Module : KmpModule()`이 있을 때 모듈이 된다. 루트는 모듈이 아니라 기본 패키지의 `object Project`이며, 저장소에 하나뿐이다. 조건이 맞는 객체가 없는 디렉터리는 그룹 (경로만 제공). `src/` 유무는 무관하다.
 - 엔진은 디렉터리 경로에서 FQN `server.domain.Module`을 유도해 로드한다 (클래스패스 스캔 없음). 로드한 객체가 `mole.module.Module`의 인스턴스인지 확인하고, 아니면 그 디렉터리는 모듈이 아니다 — 우연히 이름만 `Module`인 객체가 모듈로 오인되는 것을 막는다. 파일 이름은 관례상 `Module.kt`를 쓰지만 판정에는 쓰이지 않는다. 패키지가 경로와 다르거나 타입이 맞지 않는 객체를 다른 곳에서 `api(...)`로 넘기면 `ModuleDefError`.
 - 모듈 간 의존은 **import 한 `Module` 객체를 넘기는 것**으로 표현한다. `api(server.common.Module)`. 문자열 경로 없음.
 - 소스셋은 KMP Gradle 관례 그대로: `src/<sourceSet>/kotlin`, `src/<sourceSet>/resources`.
-- `mole`은 JVM 소스셋이며 자동화 전용이다. 그 모듈에 `jvm` 타깃이 있으면 `jvmTest → jvmMain → commonMain`을 본다. 없으면 엔진 API만 보고 native/js는 산출물로 다룬다.
+- 루트 `src/mole`은 저장소 공용 코드다. `Project.kt` 다음, 모든 `Module.kt`보다 먼저 컴파일되며 클래스패스는 엔진 + `Project` + `Project.mole` 의존성뿐이다. 모든 `Module.kt`와 모듈 `src/mole`이 import 할 수 있다 (Gradle `buildSrc`). 루트 `Tasks.kt`도 여기 있다.
+- 모듈의 `src/mole`은 JVM 소스셋이며 자동화 전용이다. 자기 `Module`, 루트 `src/mole`, 그리고 그 모듈에 `jvm` 타깃이 있으면 `jvmTest → jvmMain → commonMain`을 본다. `commonTest`는 TODO다 — 지금은 `jvm` 타깃이 있을 때 `jvmTest` 컴파일에 딸려 오는 것만 보인다. `jvm` 타깃이 없으면 엔진 API만 보고 native/js는 산출물로 다룬다.
 - 태스크 주소 = 모듈 경로 `:` 타깃 `:` 태스크. `server/domain:jvm:test`, `cli:linuxX64:link`, 집계는 `server/domain:test`, 루트는 `ci`.
 
 ```mermaid
 flowchart LR
-    mole["src/mole (JVM)"] --> jvmTest --> jvmMain --> commonMain
-    mole --> Module["Module.kt (자기·의존 모듈)"]
+    mole["모듈 src/mole (JVM)"] --> jvmTest --> jvmMain --> commonMain
+    jvmTest --> commonTest --> commonMain
+    mole -.->|TODO| commonTest
+    mole --> Module["자기·의존 모듈의 Module.kt"]
+    mole --> rootMole
     Module --> otherModule["다른 모듈의 Module.kt"]
-    Module --> engine["엔진 코어 + 활성 확장 module API<br/>+ mole.toml의 module-libs"]
-    otherModule --> engine
+    Module --> rootMole["루트 src/mole (공용 프리셋)"]
+    otherModule --> rootMole
+    rootMole --> Project["Project.kt (버전 카탈로그)"]
+    Project --> engine["엔진 코어 + 활성 확장 module API<br/>+ mole.toml의 module-libs"]
+    Module --> engine
     nativeMain --> commonMain
     jsMain --> commonMain
 ```
@@ -217,6 +228,7 @@ import mole.module.*
 import mole.jvm.*                                  // jvm 확장 API
 import mole.native.*                               // native 확장 API
 import server.common.Module as common              // 다른 모듈의 컴파일 단계 코드
+import Presets                                     // 루트 src/mole의 저장소 공용 프리셋
 import Libs
 
 object Module : KmpModule() {
@@ -252,7 +264,7 @@ object Module : KmpModule() {
         mole { implementation(Libs.tcPostgres) } // 자동화 소스셋 의존성
     }
 
-    override val kotlin = KotlinOptions(languageVersion = "2.2", freeArgs = listOf("-Xcontext-parameters"))
+    override val kotlin = Presets.kotlin                           // 루트 src/mole의 프리셋
     override val jvm = common.jvm                                  // 다른 모듈의 옵션 재사용
     override val native = NativeOptions(binaries = { executable("domain-cli") { entryPoint = "server.domain.main" } })
 
@@ -269,9 +281,19 @@ object Module : KmpModule() {
 
 타깃이 하나뿐인 모듈은 `JvmModule`/`JsModule`/`NativeModule`을 쓰면 `commonMain` 대신 `main`/`test` 소스셋 이름을 쓴다.
 
+`Presets`는 루트 `src/mole`에 있는 저장소 공용 코드다. 어떤 `Module.kt`보다 먼저 컴파일되므로 모든 모듈이 import 할 수 있고, 엔진 `module` API와 `Project`만 본다.
+
+```kotlin
+// src/mole/kotlin/Presets.kt — 루트. 모든 Module.kt가 공유하는 옵션
+object Presets {
+    val kotlin = KotlinOptions(languageVersion = "2.2", freeArgs = listOf("-Xcontext-parameters"))
+    val jvm = JvmOptions(target = 21)
+}
+```
+
 ### 의존성 표기
 
-모든 스코프 함수가 네 형태를 받는다.
+모든 스코프 함수가 다섯 형태를 받는다. `Group`은 의존성이 아니라 의존성을 만드는 팩토리다.
 
 | 형태      | 예                                                          | 타입                 |
 |-----------|-------------------------------------------------------------|----------------------|
@@ -291,6 +313,12 @@ data class JarFile(val path: Path) : Dependency
 abstract class Module : Dependency                        // 모듈 정의의 기반 타입. object Module 자체가 Dependency
 data class Platform(val bom: Artifact) : Dependency
 data class Npm(val name: String, val version: String) : Dependency   // js 확장
+
+/** 같은 그룹의 아티팩트를 여러 개 쓸 때 그룹 ID와 공용 버전을 한 번만 적기 위한 팩토리. Dependency가 아니다. */
+data class Group(val id: String, val version: String? = null) {
+    /** 버전을 생략하면 그룹 공용 버전, 그것도 없으면 platform(BOM)에서 온다. */
+    operator fun invoke(name: String, version: String? = this.version): Artifact = Artifact(id, name, version)
+}
 ```
 
 Maven/Gradle 호환:
@@ -298,40 +326,82 @@ Maven/Gradle 호환:
 - POM과 **Gradle Module Metadata**(`.module`)를 모두 읽는다. KMP 라이브러리는 GMM의 variant로 타깃별 아티팩트를 선택하므로 GMM 읽기는 KMP 코어의 필수 기능이다.
 - 충돌은 Gradle과 같은 highest-wins가 기본, `conflictStrategy = NearestWins`(Maven)로 바꿀 수 있다. `./mole --why org.x:y`로 경로 확인.
 
-### 버전 카탈로그 — `Libs.kt`
+### 버전 카탈로그 — `Project.versionCatalog`
 
-루트의 일반 Kotlin `object`. 모든 `Module.kt`가 import 한다.
-
-같은 그룹의 아티팩트를 여러 개 쓰는 것이 보통이라 그룹 ID와 그룹 공용 버전을 한 번만 적을 수 있도록 `Group` 타입을 둔다.
+루트의 `Project.kt`는 저장소 전체의 정의다. 모듈이 아니므로 타깃·소스셋이 없고, **버전 카탈로그 인스턴스**와 루트 `src/mole`의 의존성을 정한다.
 
 ```kotlin
 // 엔진 API (mole.module)
-data class Group(val id: String, val version: String? = null) {
-    /** 그룹 안의 아티팩트. 버전을 생략하면 그룹 공용 버전, 그것도 없으면 platform(BOM)에서 온다. */
-    operator fun invoke(name: String, version: String? = this.version): Artifact = Artifact(id, name, version)
+abstract class Project {
+    open val versionCatalog: VersionCatalog = versionCatalog { }
+    open val mole: Dependencies = dependencies { }          // 루트 src/mole 의존성
+}
+
+class VersionCatalog {
+    val groups: Map<String, Group>
+    val libraries: Map<String, Artifact>
+    val bundles: Map<String, List<Artifact>>
+    operator fun get(alias: String): Artifact                // 없으면 ModuleDefError
+    fun group(alias: String): Group
 }
 ```
 
 ```kotlin
-// Libs.kt — 위 Module.kt 예시가 쓰는 것만
-object Libs {
-    private val kotlin = Group("org.jetbrains.kotlin", "2.2.20")
-    private val kotlinx = Group("org.jetbrains.kotlinx")                  // 라이브러리마다 버전이 달라 공용 버전 없음
-    private val spring = Group("org.springframework.boot", "4.0.2")
+// Project.kt — 위 Module.kt 예시가 쓰는 것만
+import kr.lul.mole.catalog.Groups                            // module-libs 로 배포된 조직 공용 그룹
 
-    val kotlinTest = kotlin("kotlin-test")                          // 2.2.20
-    val coroutines = kotlinx("kotlinx-coroutines-core", "1.10.2")
-    val serialization = kotlinx("kotlinx-serialization-json", "1.9.0")
-    val kotlinxIo = kotlinx("kotlinx-io-core", "0.8.0")
-    val springBom = spring("spring-boot-dependencies")             // 4.0.2
-    val springStarter = spring("spring-boot-starter")                  // 4.0.2
-    val junit = Artifact("org.junit.jupiter", "junit-jupiter", "6.0.1")          // 하나뿐이면 Group 없이
-    val tcPostgres = Artifact("org.testcontainers", "postgresql", "1.21.3")
-    val micronautDataKsp = Artifact("io.micronaut.data", "micronaut-data-processor", "4.9.0")
+object Project : mole.module.Project() {
+    override val versionCatalog = versionCatalog {
+        group("kotlin", "org.jetbrains.kotlin", "2.2.20")
+        group("kotlinx", "org.jetbrains.kotlinx")            // 라이브러리마다 버전이 달라 공용 버전 없음
+        group("spring", "org.springframework.boot", "4.0.2")
+        group("lul", Groups.lul)                             // 배포된 Group 인스턴스를 그대로
+
+        library("kotlin-test", "kotlin", "kotlin-test")      // 2.2.20
+        library("coroutines", "kotlinx", "kotlinx-coroutines-core", "1.10.2")
+        library("serialization", "kotlinx", "kotlinx-serialization-json", "1.9.0")
+        library("kotlinx-io", "kotlinx", "kotlinx-io-core", "0.8.0")
+        library("spring-bom", "spring", "spring-boot-dependencies")
+        library("spring-starter", "spring", "spring-boot-starter")
+        library("junit", "org.junit.jupiter:junit-jupiter:6.0.1")           // 하나뿐이면 그룹 없이
+        library("tc-postgres", "org.testcontainers:postgresql:1.21.3")
+        library("micronaut-data-ksp", "io.micronaut.data:micronaut-data-processor:4.9.0")
+        library("lul-common", "lul", "common")
+
+        toml("gradle/libs.versions.toml")                    // TOML 가져오기 (옵션, 여러 번 가능)
+    }
 }
 ```
 
-그룹은 저장소 밖으로도 공유된다. 조직 공용 그룹 선언을 `module-libs` 아티팩트로 배포하면 각 저장소의 `Libs.kt`는 아티팩트 이름만 적는다.
+`Module.kt`에서는 별칭으로 바로 꺼내 쓴다. 문자열이지만 A 단계 로드 시점에 없는 별칭은 `ModuleDefError`로 잡힌다.
+
+```kotlin
+commonMain { implementation(Project.versionCatalog["coroutines"]) }
+jvmMain { platform(Project.versionCatalog["spring-bom"]); implementation(Project.versionCatalog.group("spring")("spring-boot-actuator")) }
+```
+
+**`Libs.kt`는 그 위에 얹는 선택 사항**이다. 카탈로그 인스턴스의 항목에 Kotlin 이름을 붙여 IDE 자동완성·리팩터링·참조 찾기를 얻는다. `Project.kt`와 같은 루트 컴파일 단위라 `Project`를 바로 볼 수 있다.
+
+```kotlin
+// Libs.kt — 카탈로그 위에 얹는 별칭 (선택)
+object Libs {
+    private val c = Project.versionCatalog
+
+    val kotlinTest = c["kotlin-test"]
+    val coroutines = c["coroutines"]
+    val serialization = c["serialization"]
+    val kotlinxIo = c["kotlinx-io"]
+    val springBom = c["spring-bom"]
+    val springStarter = c["spring-starter"]
+    val junit = c["junit"]
+    val tcPostgres = c["tc-postgres"]
+    val micronautDataKsp = c["micronaut-data-ksp"]
+
+    val spring = c.group("spring")                           // 그룹도 꺼낼 수 있다: Libs.spring("spring-boot-actuator")
+}
+```
+
+그룹은 저장소 밖으로도 공유된다. 조직 공용 그룹 선언을 `module-libs` 아티팩트로 배포하면 각 저장소의 `Project.kt`는 그 그룹을 등록하고 아티팩트 이름만 적는다 (위 `Groups.lul`).
 
 ```kotlin
 // kr.lul.mole:kmp-build 에 들어 있는 조직 공용 그룹 (배포된 A 단계 라이브러리)
@@ -343,45 +413,17 @@ object Groups {
 }
 ```
 
-```kotlin
-// 각 저장소의 Libs.kt — 버전은 공용 그룹에서, 이름만 여기서
-import kr.lul.mole.catalog.Groups
+버전을 올릴 때는 공용 그룹 아티팩트 한 번, 저장소는 `mole.toml`의 `module-libs` 버전 한 줄만 바꾼다. `--why`는 그 아티팩트가 어느 `Group`·`library` 선언에서 왔는지 소스 위치까지 보여 준다.
 
-object Libs {
-    val kotlinTest = Groups.kotlin("kotlin-test")
-    val springStarter = Groups.spring("spring-boot-starter")
-    val lulCommon = Groups.lul("common")
-}
-```
+기본은 이렇게 **Kotlin 코드**다. 컴파일 단계 코드가 이미 Kotlin이므로 카탈로그도 같은 언어·같은 컴파일 단위에 두면 `Group` 같은 타입을 그대로 쓸 수 있다.
 
-버전을 올릴 때는 공용 그룹 아티팩트 한 번, 저장소는 `mole.toml`의 `module-libs` 버전 한 줄만 바꾼다. `--why`는 그 아티팩트가 어느 `Group` 선언에서 왔는지 소스 위치까지 보여 준다.
-
-기본은 이렇게 **Kotlin 코드 (`*.kt`)** 다. 컴파일 단계 코드가 이미 Kotlin이므로 카탈로그도 같은 언어·같은 컴파일 단위에 두면 IDE 자동완성·리팩터링·참조 찾기가 그대로 통하고, `Group` 같은 타입도 쓸 수 있다.
-
-**TOML은 옵션**으로 허용한다. Gradle에서 옮겨오는 중이거나, 봇 (Renovate/Dependabot)이 버전을 올려 주길 원하는 저장소를 위한 것이다. `mole.toml`에 한 줄 적으면 된다.
-
-```toml
-[catalog]
-toml = ["gradle/libs.versions.toml"]      # 여러 개 가능
-```
-
-엔진이 각 파일을 `build/generated/module/<이름>Toml.kt`로 변환해 컴파일 단계 단위에 합친다. `libs.versions.toml`이면 `object LibsToml`이 되고, `[versions]`·`[libraries]`·`[bundles]`·`[plugins]`가 각각 `v`·최상위 프로퍼티·`bundles`·`plugins`로 대응된다. 생성된 객체는 `Libs.kt`와 같은 타입 (`Artifact`, `Group`)을 쓰므로 두 방식을 섞어도 된다.
-
-```kotlin
-// Libs.kt — 직접 쓴 것과 TOML에서 온 것을 한곳에 모아 노출
-object Libs {
-    val springStarter = Group("org.springframework.boot", "4.0.2")("spring-boot-starter")
-    val junit = LibsToml.junit_jupiter                   // gradle/libs.versions.toml의 [libraries] junit-jupiter
-}
-```
-
-생성 코드는 읽기 전용이고 `--model`에 출처 (`catalog: gradle/libs.versions.toml`)가 표시된다. TOML만 쓰는 저장소도 `Libs.kt` 없이 `LibsToml`을 바로 import 하면 된다.
+**TOML은 옵션**으로 허용한다. Gradle에서 옮겨오는 중이거나, 봇 (Renovate/Dependabot)이 버전을 올려 주길 원하는 저장소를 위한 것이다. `versionCatalog { toml("gradle/libs.versions.toml") }` 한 줄이면 `[versions]`·`[libraries]`·`[bundles]`가 같은 인스턴스에 합쳐지고 별칭은 TOML 키 그대로다 (`Project.versionCatalog["junit-jupiter"]`). `[plugins]`는 대응 개념이 없어 무시한다. 코드로 적은 것과 TOML에서 온 것이 같은 타입 (`Artifact`, `Group`)이므로 섞어도 되고, `--model`에 각 항목의 출처 (`Project.kt:12`, `catalog: gradle/libs.versions.toml`)가 표시된다. TOML만 쓰는 저장소는 `Project.kt`에 `toml(...)` 한 줄만 있으면 된다.
 
 ### 컴파일 단위와 순서
 
-- 저장소 안 **모듈 루트의 모든 `.kt`는 하나의 컴파일 단위**다. 모듈 그래프는 `Module.kt`가 정의하므로 컴파일 전에 알 수 없고, 따라서 어느 `Module`이든 서로 import 할 수 있다. 순환 의존은 로드 후 그래프 검사에서 `ModuleDefError`.
-- 클래스패스: 엔진 코어 + 활성 확장 `module` API + `module-libs`. 프로젝트 소스는 보이지 않는다.
-- 이후 모듈 그래프 위상 순서로 타깃별 컴파일: `commonMain` metadata → 각 타깃 main → 각 타깃 test → `mole`.
+- 순서는 ① 루트 `*.kt` (`Project.kt`, `Libs.kt`) → ② 루트 `src/mole` → ③ 모든 모듈 루트의 `*.kt` → ④ 모듈 그래프 위상 순서로 타깃별 컴파일: `commonMain` metadata → 각 타깃 main → 각 타깃 test → ⑤ 모듈 `src/mole`.
+- ①②③은 각각 **하나의 컴파일 단위**다. 모듈 그래프는 `Module.kt`가 정의하므로 컴파일 전에 알 수 없고, 따라서 어느 `Module`이든 서로 import 할 수 있다. 순환 의존은 로드 후 그래프 검사에서 `ModuleDefError`.
+- 클래스패스: ①은 엔진 코어 + 활성 확장 `module` API + `module-libs`. ②는 거기에 `Project` + `Project.mole` 의존성. ③은 거기에 루트 `src/mole`. 프로젝트 소스는 어느 단위에도 보이지 않는다.
 
 ## B. 자동화 단계 — `src/mole/kotlin`
 
@@ -467,16 +509,10 @@ object Tasks : ModuleTasks(Module) {                 // 관례 트리 상속
 순서가 의미 있으면 `List`, 없으면 `Set`. 관례 `test` 집계가 `parallel`인 이유는 타깃 간 순서가 없기 때문이다.
 
 ```kotlin
-// 루트 src/mole/kotlin/Tasks.kt
-import server.domain.Tasks as domain
-import cli.Tasks as cli
-import web.Tasks as web
-
+// 루트 src/mole/kotlin/Tasks.kt — 어떤 Module.kt보다 먼저 컴파일되므로 모듈의 Tasks를 import 할 수 없다
 object Tasks : RootTasks() {
     val verify = parallel {
-        +domain.test
-        +cli.linuxX64.test
-        +web.js.test
+        modules.forEach { +it.test }                                // 모든 모듈의 집계 test (재정의 반영)
     }
     val ci = seq {
         +verify
@@ -491,6 +527,8 @@ object Tasks : RootTasks() {
     fun main(args: Array<String>) = Mole.main(this, args)
 }
 ```
+
+`modules`는 B 시작 시 로드된 모듈 그래프에서 오는 `List<ModuleTasks>`다. 루트 `src/mole`은 어떤 `Module.kt`보다 먼저 컴파일되므로 `server.domain.Tasks`를 import 할 수 없는 대신, 모듈을 추가해도 루트 `Tasks.kt`를 고칠 필요가 없다. 특정 모듈은 `modules["server/domain"]`.
 
 동시성은 `java.util.concurrent`만 (`invokeAll`/`invokeAny`, 이름 붙인 플랫폼 스레드). kotlinx.coroutines는 자동화 코드에서 쓰지 않는다.
 
@@ -563,10 +601,12 @@ Fs.fingerprint(paths)                                                         //
 | Gradle                                     | mole                                       |
 |--------------------------------------------|--------------------------------------------|
 | `build.gradle.kts` (모듈 루트)             | `Module.kt` (모듈 루트)                    |
+| `build.gradle.kts` (루트)                  | `Project.kt`                               |
 | `settings.gradle.kts` + wrapper            | `mole.toml` + `mole`                       |
+| `buildSrc`                                 | 루트 `src/mole`                            |
 | `include(":a:b")`                          | 없음. `Module.kt`가 있는 디렉터리가 모듈   |
 | `project(":a:b")`                          | `a.b.Module` (import)                      |
-| `libs.versions.toml`                       | `Libs.kt` (기본) 또는 TOML 가져오기 (옵션) |
+| `libs.versions.toml`                       | `Project.versionCatalog` (코드 기본, TOML 가져오기 옵션) + `Libs.kt` 별칭 (옵션) |
 | `kotlin { jvm(); linuxX64() }`             | `targets { jvm(); linuxX64() }`            |
 | `sourceSets.jvmMain.dependencies { }`      | `sourceSets { jvmMain { } }`               |
 | 플러그인                                   | 타깃 확장(A) 또는 `Tasks.kt`(B)            |
@@ -681,7 +721,8 @@ steps:
 
 | 하지 마세요                            | 대신                                                            |
 |----------------------------------------|-----------------------------------------------------------------|
-| `Module.kt`에서 프로젝트 소스 참조     | 구조상 불가. 다른 모듈의 `Module`은 허용                        |
+| `Module.kt`에서 프로젝트 소스 참조     | 구조상 불가. 다른 모듈의 `Module`과 루트 `src/mole`은 허용      |
+| 루트 `src/mole`에서 모듈의 `Module`·`Tasks` import | 구조상 불가 (먼저 컴파일). `modules`로 런타임 참조   |
 | `object Module`을 `src/` 아래에 두기   | 모듈 루트의 `*.kt`. 경로 = 패키지인 `object Module`이 모듈 판정 |
 | 모듈 의존을 문자열 경로로              | `api(server.common.Module)`                                     |
 | 타깃 확장 외의 방식으로 A 확장         | B의 `Tasks.kt`                                                  |
@@ -694,11 +735,13 @@ steps:
 
 ## FAQ
 
-**자기 프로젝트의 `src/mole`을 라이브러리로 만들어 자기 `Module.kt`에서 쓰면?** 엔진이 거부한다 (`ModuleDefError: module-libs must be versioned external artifacts`). `module-libs`는 `g:n:v`만 받고 `jar()`·모듈 참조를 받지 않는다.
+**모듈의 `src/mole`을 라이브러리로 만들어 `Module.kt`에서 쓰면?** 엔진이 거부한다 (`ModuleDefError: module-libs must be versioned external artifacts`). `module-libs`는 `g:n:v`만 받고 `jar()`·모듈 참조를 받지 않는다. 저장소 안에서 `Module.kt`가 쓸 코드는 루트 `src/mole`에 둔다. 그것은 어떤 `Module`보다 먼저 컴파일되므로 순환이 없다.
 
-**빌드 없이 자동화만 쓸 수 있나?** 예. `AutomationModule`을 상속한 최소 `Module.kt`와 `Tasks.kt`. 타깃 확장도 필요 없다. 반대로 `Tasks.kt` 없이 `Module.kt`만 있으면 관례 태스크로 빌드·테스트가 된다.
+**빌드 없이 자동화만 쓸 수 있나?** 예. `Project.kt`와 `src/mole/kotlin/Tasks.kt`. `Module.kt`도 타깃 확장도 필요 없다. 반대로 `Tasks.kt` 없이 `Module.kt`만 있으면 관례 태스크로 빌드·테스트가 된다.
 
-**`Module.kt`가 아닌 파일 이름을 쓸 수 있나?** 있다. 판정은 파일 이름이 아니라 "루트 `mole` 스크립트 기준 상대 경로 = 패키지이고 `mole.module.Module`을 상속한 `object Module`"이다. 다만 한 디렉터리에 그런 객체는 하나뿐이고, 찾기 쉽도록 `Module.kt`에 두는 것을 관례로 한다. 다른 파일 (`Libs.kt`, `Presets.kt`)은 자유롭게 추가할 수 있고 같은 단위로 컴파일된다.
+**`Libs.kt`는 꼭 있어야 하나?** 아니다. `Project.versionCatalog["coroutines"]`로 바로 쓸 수 있다. `Libs.kt`는 별칭에 Kotlin 이름과 타입을 붙여 IDE 자동완성·참조 찾기를 얻으려는 선택 사항이다.
+
+**`Module.kt`가 아닌 파일 이름을 쓸 수 있나?** 있다. 판정은 파일 이름이 아니라 "루트 `mole` 스크립트 기준 상대 경로 = 패키지이고 `mole.module.Module`을 상속한 `object Module`"이다. 다만 한 디렉터리에 그런 객체는 하나뿐이고, 찾기 쉽도록 `Module.kt`에 두는 것을 관례로 한다. 다른 파일은 자유롭게 추가할 수 있고 같은 단위로 컴파일된다.
 
 **import만 하고 `api()`로 넘기지 않으면 의존이 되나?** 아니다. import는 컴파일 단계 코드 참조일 뿐이고, 모듈 의존은 `api`/`implementation`에 객체를 넘겨야 생긴다. 옵션만 재사용 (`common.jvm`)하는 import가 그래서 가능하다.
 
@@ -731,6 +774,7 @@ steps:
 **빌드 시스템**
 
 - `commonMain` metadata 컴파일·배포 (klib) — 1차는 내부 모듈 소비만, 이후 외부 배포.
+- 모듈 `src/mole`에서 `commonTest` 보기. 지금은 `jvm` 타깃이 있을 때 `jvmTest` 컴파일에 딸려 오는 것만 보인다. `jvm` 타깃이 없는 모듈의 `commonTest` 픽스처를 자동화에서 쓰려면 metadata 컴파일 결과를 JVM으로 다시 컴파일해야 한다.
 - Gradle Module Metadata **생성**의 완전성. 다른 Gradle 프로젝트가 `mole`로 만든 KMP 라이브러리를 그대로 소비할 수 있어야 한다.
 - 원격 up-to-date 캐시 (해시 기반, 데몬 없이).
 - 오프라인 환경의 엔진·확장·konan 배포 (미러, 벤더링).
@@ -764,9 +808,9 @@ steps:
 | R3  | 태스크 트리, 독립 실행, 정의 순서 = 실행 순서 = 의존 순서       | `seq`/`firstOf`(List), `parallel`/`race`(Set)                   |
 | R4  | 타입 있는 입출력, 주입되는 터미널 IO                            | `Task<I,O>`, `pipe`, `IO`                                       |
 | R5  | 컴파일 단계와 자동화 단계 분리                                  | 단계 A / B, 다른 파일                                           |
-| R6  | 자동화 코드가 `main`/`test`를 직접 호출                         | `mole → jvmTest → jvmMain → commonMain`                         |
+| R6  | 자동화 코드가 `main`/`test`를 직접 호출                         | `mole → jvmTest → jvmMain → commonMain` (`commonTest`는 TODO)   |
 | R7  | 의존성: jar 경로 / Maven·Gradle 아티팩트 / `"g:n:v"` / 인스턴스 | `Dependency` 계층                                               |
-| R8  | 버전 카탈로그                                                   | `Libs.kt` 기본, `libs.versions.toml` 가져오기는 옵션            |
+| R8  | 버전 카탈로그                                                   | `Project.versionCatalog` (코드 기본, TOML 옵션) + `Libs.kt` 별칭 |
 | R9  | Maven/Gradle 사용자에게 익숙한 구조                             | 모듈 루트 `Module.kt`, KMP 소스셋 관례, 관례 태스크             |
 | R10 | 디렉터리 구조 = 모듈 구조. import로 모듈 간 의존 표현           | `Module.kt`가 있는 디렉터리 = 모듈, `api(server.common.Module)` |
 | R11 | IntelliJ가 자동화 코드를 직접 실행·디버그                       | `@JvmStatic main` + `./mole idea`                               |
@@ -776,7 +820,7 @@ steps:
 | R15 | 코드 생성(KSP/APT/빌드 상수)이 컴파일 입력                      | `generate { }`, `ksp`                                           |
 | R16 | KMP 기본, jvm/native/js/wasm은 확장                             | 코어 + 타깃 확장                                                |
 | R17 | 도구가 결정한 것은 전부 출력 가능                               | `--model`, `--tree`, `--explain`, `--why`                       |
-| R18 | 빌드 설정과 자동화가 공존하거나 어느 한쪽만 있어도 된다         | mole-core / mole-build 두 층                                    |
+| R18 | 빌드 설정과 자동화가 공존하거나 어느 한쪽만 있어도 된다         | mole-core / mole-build 두 층. 자동화만이면 `Project.kt` + `Tasks.kt` |
 
 ## 참고
 
