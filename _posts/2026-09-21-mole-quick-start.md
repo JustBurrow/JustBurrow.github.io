@@ -175,8 +175,8 @@ my-project/                          ← 루트 모듈 (object Module, 기본 �
 
 규칙:
 
-- **루트의 `mole` 스크립트 기준 상대 경로를 패키지로 갖는 `object Module`이 있으면 그 디렉터리가 모듈**이다. `server/domain/`은 `package server.domain`의 `object Module`이 있을 때 모듈이 되고, 루트는 기본 패키지의 `object Module`이다. 그런 객체가 없는 디렉터리는 그룹 (경로만 제공). `src/` 유무는 무관하다.
-- 엔진은 디렉터리 경로에서 FQN `server.domain.Module`을 유도해 로드한다 (클래스패스 스캔 없음). 파일 이름은 관례상 `Module.kt`를 쓰지만 판정에는 쓰이지 않는다. 패키지가 경로와 다르면 그 디렉터리는 모듈이 아니고, 다른 곳에서 참조하면 `ModuleDefError`.
+- **루트의 `mole` 스크립트 기준 상대 경로를 패키지로 갖고, `Module` 타입을 상속한 `object Module`이 있으면 그 디렉터리가 모듈**이다. 세 조건이 전부 맞아야 한다: ① 이름이 `Module`인 `object`, ② 패키지 = 상대 경로, ③ 엔진의 `mole.module.Module`(또는 그 하위 `KmpModule`/`JvmModule`/`AutomationModule`…)을 상속. `server/domain/`은 `package server.domain`의 `object Module : KmpModule()`이 있을 때 모듈이 되고, 루트는 기본 패키지의 `object Module`이다. 조건이 맞는 객체가 없는 디렉터리는 그룹 (경로만 제공). `src/` 유무는 무관하다.
+- 엔진은 디렉터리 경로에서 FQN `server.domain.Module`을 유도해 로드한다 (클래스패스 스캔 없음). 로드한 객체가 `mole.module.Module`의 인스턴스인지 확인하고, 아니면 그 디렉터리는 모듈이 아니다 — 우연히 이름만 `Module`인 객체가 모듈로 오인되는 것을 막는다. 파일 이름은 관례상 `Module.kt`를 쓰지만 판정에는 쓰이지 않는다. 패키지가 경로와 다르거나 타입이 맞지 않는 객체를 다른 곳에서 `api(...)`로 넘기면 `ModuleDefError`.
 - 모듈 간 의존은 **import 한 `Module` 객체를 넘기는 것**으로 표현한다. `api(server.common.Module)`. 문자열 경로 없음.
 - 소스셋은 KMP Gradle 관례 그대로: `src/<sourceSet>/kotlin`, `src/<sourceSet>/resources`.
 - `mole`은 JVM 소스셋이며 자동화 전용이다. 그 모듈에 `jvm` 타깃이 있으면 `jvmTest → jvmMain → commonMain`을 본다. 없으면 엔진 API만 보고 native/js는 산출물로 다룬다.
@@ -200,8 +200,8 @@ flowchart LR
 | 안                                                     | 위치·발견                                          | 장점                                                                | 단점                                                                               | 판정                                          |
 |--------------------------------------------------------|----------------------------------------------------|---------------------------------------------------------------------|------------------------------------------------------------------------------------|-----------------------------------------------|
 | ① `src/module/kotlin/Module.kt` 소스셋                 | 소스셋 관례                                        | 클래스패스가 소스셋 단위로 명확                                     | `build.gradle.kts`가 모듈 루트에 있는 것과 어긋남. 한 파일을 위해 세 단계 디렉터리 | 탈락                                          |
-| ② **모듈 루트 `*.kt` + 마커 타입 + 디렉터리→FQN** | 루트의 `*.kt`, `ModuleDef` 상속, 경로에서 FQN 유도 | Gradle과 같은 위치. **경로 = 패키지인 `object Module` 존재 = 모듈**. 발견에 스캔 불필요 | 패키지 = 경로 규칙 필요 | **채택** |
-| ③ 모듈 루트 + 클래스패스 스캔                          | `ModuleDef` 구현을 리플렉션으로 전부 탐색          | 패키지 자유                                                         | 스캔 비용, 우연한 발견, 역추적 필요                                                | 탈락                                          |
+| ② **모듈 루트 `*.kt` + 마커 타입 + 디렉터리→FQN** | 루트의 `*.kt`, `Module` 상속, 경로에서 FQN 유도 후 타입 검사 | Gradle과 같은 위치. **경로 = 패키지이고 `Module`을 상속한 `object Module` 존재 = 모듈**. 발견에 스캔 불필요 | 패키지 = 경로 규칙 필요 | **채택** |
+| ③ 모듈 루트 + 클래스패스 스캔                          | `Module` 구현을 리플렉션으로 전부 탐색          | 패키지 자유                                                         | 스캔 비용, 우연한 발견, 역추적 필요                                                | 탈락                                          |
 | ④ import 자체가 의존 선언                              | `import server.common.Module`만으로 의존           | 가장 짧음                                                           | 옵션만 읽으려는 import와 구분 불가. 암묵적                                         | 탈락. 대신 `api(server.common.Module)`로 명시 |
 
 자동화 코드 (`src/mole/kotlin`)는 소스셋으로 남긴다. 자동화는 리소스·여러 파일·`jvmTest` 의존을 갖는 "코드"이고, 모듈 정의는 "선언"이라 성격이 다르기 때문이다.
@@ -277,7 +277,7 @@ object Module : KmpModule() {
 | 문자열   | `"g:n:v"`, `"g:n:v:classifier"`, `"g:n"`(platform에서 버전) | `Artifact.parse` |
 | 인스턴스 | `Artifact("g", "n", "v")`                                   | `Artifact`       |
 | jar 경로 | `jar("lib/x.jar")`, `jars("lib/*.jar")`                     | `JarFile`        |
-| 모듈     | `api(server.common.Module)`                                 | `ModuleDef`      |
+| 모듈     | `api(server.common.Module)`                                 | `Module`         |
 | 그룹 호출 | `Libs.spring("spring-boot-starter")` | `Group` → `Artifact` |
 
 ```kotlin
@@ -287,7 +287,7 @@ data class Artifact(
     val classifier: String? = null, val extension: String = "jar"
 ) : Dependency
 data class JarFile(val path: Path) : Dependency
-abstract class ModuleDef : Dependency                     // Module 객체 자체가 Dependency
+abstract class Module : Dependency                        // 모듈 정의의 기반 타입. object Module 자체가 Dependency
 data class Platform(val bom: Artifact) : Dependency
 data class Npm(val name: String, val version: String) : Dependency   // js 확장
 ```
@@ -605,31 +605,45 @@ OrderServiceTest.calculatesTotal()               src/jvmTest/kotlin/OrderService
 
 ## 실패 분류
 
-실패는 숫자 코드가 아니라 **예외 타입**으로 분류한다. 모든 실패는 `MoleFailure`를 상속한 sealed 계층이고, 어느 단계에서 났는지가 타입에 들어 있다. 콘솔 출력·`summary.json`·IDE 디버거가 같은 타입을 본다. 프로세스 exit code는 0/1만 쓴다.
+실패의 1차 표현은 **예외 타입**이다. 모든 실패는 `MoleFailure`를 상속한 sealed 계층이고, 어느 단계에서 났는지가 타입에 들어 있다. 콘솔 출력·`summary.json`·IDE 디버거가 같은 타입을 본다. 프로세스 종료 코드는 따로 정의하지 않고 **예외 타입에서 유도**한다. 각 타입이 `exitCode`를 갖고, `main`은 잡은 예외의 그 값으로 종료한다. 코드 표를 외우는 대신 타입 계층을 보면 되고, 새 타입을 추가할 때 코드 충돌을 컴파일러가 잡아 준다.
 
 ```kotlin
-sealed class MoleFailure(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
+sealed class MoleFailure(val exitCode: Int, message: String, cause: Throwable? = null)
+    : RuntimeException(message, cause)
 
-class BootstrapFailure(…)   : MoleFailure(…)   // 단계 —
-sealed class StageAFailure  : MoleFailure(…)   // A
-class ModuleDefError(…)     : StageAFailure()
-class CompileFailure(…)     : StageAFailure()
-sealed class StageBFailure  : MoleFailure(…)   // B
-class TestFailure(…)        : StageBFailure()
-class ProcessFailure(…)     : StageBFailure()
-class EnvironmentFailure(…) : StageBFailure()
-class AutomationError(…)    : StageBFailure()  // 태스크 코드가 던진 그 밖의 예외를 감쌈
+class BootstrapFailure(…)   : MoleFailure(3, …)          // 단계 —
+
+sealed class StageAFailure(exitCode: Int, …) : MoleFailure(exitCode, …)   // A
+class ModuleDefError(…)     : StageAFailure(4, …)
+class CompileFailure(…)     : StageAFailure(5, …)
+
+sealed class StageBFailure(exitCode: Int, …) : MoleFailure(exitCode, …)   // B
+class TestFailure(…)        : StageBFailure(6, …)
+class ProcessFailure(…)     : StageBFailure(7, …)
+class EnvironmentFailure(…) : StageBFailure(8, …)
+class AutomationError(…)    : StageBFailure(1, …)        // 태스크 코드가 던진 그 밖의 예외를 감쌈
+
+// Mole.main
+fun main(root: Tasks, args: Array<String>) {
+    exitProcess(
+        try { Run(root, args).execute(); 0 }
+        catch (f: MoleFailure) { report.failure(f); f.exitCode }
+        catch (t: Throwable)   { report.failure(AutomationError(t)); 1 }   // 분류 안 된 예외는 전부 1
+    )
+}
 ```
 
-| 예외                 | 단계 | 뜻                                                                          |
-|----------------------|------|-----------------------------------------------------------------------------|
-| `BootstrapFailure`   | —    | JDK 없음, 엔진·확장 확보 실패, `mole.toml` 오류                             |
-| `ModuleDefError`     | A    | 모듈 루트 `*.kt` 컴파일·실행 실패, 패키지≠경로, 순환 의존, 의존성 해석 실패 |
-| `CompileFailure`     | A    | 소스셋 컴파일 실패 (타깃·소스셋 표기)                                       |
-| `TestFailure`        | B    | 테스트 실패 (타깃 표기)                                                     |
-| `ProcessFailure`     | B    | 외부 프로세스 비정상 종료. 재현 명령 포함                                   |
-| `EnvironmentFailure` | B    | Docker, konan 툴체인, node 부재                                             |
-| `AutomationError`    | B    | 태스크 코드 예외                                                            |
+| 예외                 | 단계 | exit | 뜻                                                                          |
+|----------------------|------|------|-----------------------------------------------------------------------------|
+| `BootstrapFailure`   | —    | 3    | JDK 없음, 엔진·확장 확보 실패, `mole.toml` 오류                             |
+| `ModuleDefError`     | A    | 4    | 모듈 루트 `*.kt` 컴파일·실행 실패, 패키지≠경로, 타입 불일치, 순환 의존, 의존성 해석 실패 |
+| `CompileFailure`     | A    | 5    | 소스셋 컴파일 실패 (타깃·소스셋 표기)                                       |
+| `TestFailure`        | B    | 6    | 테스트 실패 (타깃 표기)                                                     |
+| `ProcessFailure`     | B    | 7    | 외부 프로세스 비정상 종료. 재현 명령 포함                                   |
+| `EnvironmentFailure` | B    | 8    | Docker, konan 툴체인, node 부재                                             |
+| `AutomationError`    | B    | 1    | 태스크 코드 예외, 분류되지 않은 모든 예외                                   |
+
+CI 스크립트는 종료 코드로 A/B를 가르고 (`3–5`면 빌드툴·설정, `6`이면 테스트, 나머지 B는 자동화), 사람은 `summary.json`의 예외 타입과 스택을 본다. 같은 정보를 두 소비자에 맞게 렌더링한 것이다.
 
 `Tasks.kt`에서도 같은 타입을 던지고 잡는다. `firstOf`가 앞선 실패를 `absorbed`로 삼키는 것, `race` 패자를 interrupt 하는 것도 이 계층 위에서 동작한다.
 
@@ -648,6 +662,7 @@ ci
 │  └─ web:js:test                  ok    4.2s
 └─ report                          skipped
 TestFailure: server/domain:jvm:test — 2 failed  (build/reports/summary.json)
+exit 6
 ```
 
 ## CI
@@ -687,7 +702,7 @@ steps:
 
 **빌드 없이 자동화만 쓸 수 있나?** 예. `AutomationModule`을 상속한 최소 `Module.kt`와 `Tasks.kt`. 타깃 확장도 필요 없다. 반대로 `Tasks.kt` 없이 `Module.kt`만 있으면 관례 태스크로 빌드·테스트가 된다.
 
-**`Module.kt`가 아닌 파일 이름을 쓸 수 있나?** 있다. 판정은 파일 이름이 아니라 "루트 `mole` 스크립트 기준 상대 경로 = 패키지인 `object Module`"이다. 다만 한 디렉터리에 그런 객체는 하나뿐이고, 찾기 쉽도록 `Module.kt`에 두는 것을 관례로 한다. 다른 파일 (`Libs.kt`, `Presets.kt`)은 자유롭게 추가할 수 있고 같은 단위로 컴파일된다.
+**`Module.kt`가 아닌 파일 이름을 쓸 수 있나?** 있다. 판정은 파일 이름이 아니라 "루트 `mole` 스크립트 기준 상대 경로 = 패키지이고 `mole.module.Module`을 상속한 `object Module`"이다. 다만 한 디렉터리에 그런 객체는 하나뿐이고, 찾기 쉽도록 `Module.kt`에 두는 것을 관례로 한다. 다른 파일 (`Libs.kt`, `Presets.kt`)은 자유롭게 추가할 수 있고 같은 단위로 컴파일된다.
 
 **import만 하고 `api()`로 넘기지 않으면 의존이 되나?** 아니다. import는 컴파일 단계 코드 참조일 뿐이고, 모듈 의존은 `api`/`implementation`에 객체를 넘겨야 생긴다. 옵션만 재사용 (`common.jvm`)하는 import가 그래서 가능하다.
 
