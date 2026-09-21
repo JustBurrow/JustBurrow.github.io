@@ -77,11 +77,11 @@ A는 Gradle이 관례로 해주던 것의 최소 집합이고, B는 플러그인
 
 이 되먹임은 **버전 붙은 아티팩트 경계를 넘어서만** 허용한다.
 
-| 경로                                                                             | 허용                | 이유                                                                     |
-|----------------------------------------------------------------------------------|---------------------|--------------------------------------------------------------------------|
-| 저장소 X의 `src/mole` → 배포(`kr.lul.mole:kmp-build:0.5.0`) → 저장소 Y의 `mole.toml` | ○ | 엔진·확장·KMP 빌드 시스템이 만들어지는 정상 경로. `kmp-build` 자체가 이 경로로 배포된 B 단계 코드다 |
-| 같은 저장소 안에서 자기 `src/mole` 산출물을 자기 `Module.kt`가 참조              | **×** (엔진이 거부) | 한 Run 안의 순환. A가 B보다 먼저 끝나야 한다는 전제가 깨짐               |
-| 같은 저장소의 이전 빌드 산출물을 `jar()`로 A에 넣기                              | ×                   | "지금 코드"와 "굳힌 코드"가 한 저장소에 공존해 어느 쪽이 진실인지 헷갈림 |
+| 경로                                                                                 | 허용                | 이유                                                                                                |
+|--------------------------------------------------------------------------------------|---------------------|-----------------------------------------------------------------------------------------------------|
+| 저장소 X의 `src/mole` → 배포(`kr.lul.mole:kmp-build:0.5.0`) → 저장소 Y의 `mole.toml` | ○                   | 엔진·확장·KMP 빌드 시스템이 만들어지는 정상 경로. `kmp-build` 자체가 이 경로로 배포된 B 단계 코드다 |
+| 같은 저장소 안에서 자기 `src/mole` 산출물을 자기 `Module.kt`가 참조                  | **×** (엔진이 거부) | 한 Run 안의 순환. A가 B보다 먼저 끝나야 한다는 전제가 깨짐                                          |
+| 같은 저장소의 이전 빌드 산출물을 `jar()`로 A에 넣기                                  | ×                   | "지금 코드"와 "굳힌 코드"가 한 저장소에 공존해 어느 쪽이 진실인지 헷갈림                            |
 
 권장하지 않는 이유는 기술이 아니라 인지 부담이다. 한 저장소 안에서 같은 코드가 "실행되는 태스크"이면서 "컴파일을 정하는 라이브러리"이면, 실패 원인을 A/B로 가르는 첫 분류 (R1)가 무너진다. 프리셋을 공유하고 싶으면 별도 저장소로 분리해 버전을 붙여 배포한다.
 
@@ -123,7 +123,7 @@ Gradle 대응: `mole.toml` ≈ `gradle-wrapper.properties` + `settings.gradle.kt
 // Module.kt — 자동화 전용 프로젝트
 object Module : AutomationModule() {
     override val sourceSets = sourceSets {
-        mole { implementation(Libs.tcLibs.postgresql); implementation("software.amazon.awssdk:s3:2.32.0") }
+        mole { implementation(Libs.tcPostgres); implementation("software.amazon.awssdk:s3:2.32.0") }
     }
 }
 ```
@@ -136,6 +136,7 @@ object Tasks : RootTasks() {
     }
     val rotate = task { Secrets.rotate(env("VAULT_ADDR")) }
     val nightly = seq { +backup; +rotate; +task("report") { report.writeJson(file("build/reports/summary.json")) } }
+
     @JvmStatic
     fun main(args: Array<String>) = Mole.main(this, args)
 }
@@ -197,12 +198,12 @@ flowchart LR
 
 "컴파일 단계 코드가 굳이 소스셋 디렉터리에 있어야 하나"를 놓고 비교한 결과다.
 
-| 안                                                     | 위치·발견                                          | 장점                                                                | 단점                                                                               | 판정                                          |
-|--------------------------------------------------------|----------------------------------------------------|---------------------------------------------------------------------|------------------------------------------------------------------------------------|-----------------------------------------------|
-| ① `src/module/kotlin/Module.kt` 소스셋                 | 소스셋 관례                                        | 클래스패스가 소스셋 단위로 명확                                     | `build.gradle.kts`가 모듈 루트에 있는 것과 어긋남. 한 파일을 위해 세 단계 디렉터리 | 탈락                                          |
-| ② **모듈 루트 `*.kt` + 마커 타입 + 디렉터리→FQN** | 루트의 `*.kt`, `Module` 상속, 경로에서 FQN 유도 후 타입 검사 | Gradle과 같은 위치. **경로 = 패키지이고 `Module`을 상속한 `object Module` 존재 = 모듈**. 발견에 스캔 불필요 | 패키지 = 경로 규칙 필요 | **채택** |
-| ③ 모듈 루트 + 클래스패스 스캔                          | `Module` 구현을 리플렉션으로 전부 탐색          | 패키지 자유                                                         | 스캔 비용, 우연한 발견, 역추적 필요                                                | 탈락                                          |
-| ④ import 자체가 의존 선언                              | `import server.common.Module`만으로 의존           | 가장 짧음                                                           | 옵션만 읽으려는 import와 구분 불가. 암묵적                                         | 탈락. 대신 `api(server.common.Module)`로 명시 |
+| 안                                                | 위치·발견                                                    | 장점                                                                                                        | 단점                                                                               | 판정                                          |
+|---------------------------------------------------|--------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------|-----------------------------------------------|
+| ① `src/module/kotlin/Module.kt` 소스셋            | 소스셋 관례                                                  | 클래스패스가 소스셋 단위로 명확                                                                             | `build.gradle.kts`가 모듈 루트에 있는 것과 어긋남. 한 파일을 위해 세 단계 디렉터리 | 탈락                                          |
+| ② **모듈 루트 `*.kt` + 마커 타입 + 디렉터리→FQN** | 루트의 `*.kt`, `Module` 상속, 경로에서 FQN 유도 후 타입 검사 | Gradle과 같은 위치. **경로 = 패키지이고 `Module`을 상속한 `object Module` 존재 = 모듈**. 발견에 스캔 불필요 | 패키지 = 경로 규칙 필요                                                            | **채택**                                      |
+| ③ 모듈 루트 + 클래스패스 스캔                     | `Module` 구현을 리플렉션으로 전부 탐색                       | 패키지 자유                                                                                                 | 스캔 비용, 우연한 발견, 역추적 필요                                                | 탈락                                          |
+| ④ import 자체가 의존 선언                         | `import server.common.Module`만으로 의존                     | 가장 짧음                                                                                                   | 옵션만 읽으려는 import와 구분 불가. 암묵적                                         | 탈락. 대신 `api(server.common.Module)`로 명시 |
 
 자동화 코드 (`src/mole/kotlin`)는 소스셋으로 남긴다. 자동화는 리소스·여러 파일·`jvmTest` 의존을 갖는 "코드"이고, 모듈 정의는 "선언"이라 성격이 다르기 때문이다.
 
@@ -230,25 +231,25 @@ object Module : KmpModule() {
     override val sourceSets = sourceSets {
         commonMain {
             api(common)                                              // 모듈 의존 = import 한 객체
-            implementation(Libs.kotlinxLibs.coroutines)
-            implementation(Libs.kotlinxLibs.serialization)
+            implementation(Libs.coroutines)
+            implementation(Libs.serialization)
         }
-        commonTest { implementation(Libs.kotlinLibs.test) }
+        commonTest { implementation(Libs.kotlinTest) }
 
         jvmMain {
-            platform(Libs.springLibs.bom)
-            implementation(Libs.springLibs.bootStarter)
+            platform(Libs.springBom)
+            implementation(Libs.springStarter)
             implementation("org.postgresql:postgresql:42.7.5")
             implementation(Artifact("com.zaxxer", "HikariCP", "7.0.2"))
             implementation(jar("lib/legacy-pricing-1.2.jar"))
-            ksp(Libs.ksp.micronautData)
+            ksp(Libs.micronautDataKsp)
         }
         jvmTest {
-            implementation(Libs.junitLibs.jupiter)
-            implementation(Libs.tcLibs.postgresql)
+            implementation(Libs.junit)
+            implementation(Libs.tcPostgres)
         }
-        nativeMain { implementation(Libs.kotlinxLibs.io) }
-        mole { implementation(Libs.tcLibs.postgresql) } // 자동화 소스셋 의존성
+        nativeMain { implementation(Libs.kotlinxIo) }
+        mole { implementation(Libs.tcPostgres) } // 자동화 소스셋 의존성
     }
 
     override val kotlin = KotlinOptions(languageVersion = "2.2", freeArgs = listOf("-Xcontext-parameters"))
@@ -272,13 +273,13 @@ object Module : KmpModule() {
 
 모든 스코프 함수가 네 형태를 받는다.
 
-| 형태     | 예                                                          | 타입             |
-|----------|-------------------------------------------------------------|------------------|
-| 문자열   | `"g:n:v"`, `"g:n:v:classifier"`, `"g:n"`(platform에서 버전) | `Artifact.parse` |
-| 인스턴스 | `Artifact("g", "n", "v")`                                   | `Artifact`       |
-| jar 경로 | `jar("lib/x.jar")`, `jars("lib/*.jar")`                     | `JarFile`        |
-| 모듈     | `api(server.common.Module)`                                 | `Module`         |
-| 그룹 호출 | `Libs.spring("spring-boot-starter")` | `Group` → `Artifact` |
+| 형태      | 예                                                          | 타입                 |
+|-----------|-------------------------------------------------------------|----------------------|
+| 문자열    | `"g:n:v"`, `"g:n:v:classifier"`, `"g:n"`(platform에서 버전) | `Artifact.parse`     |
+| 인스턴스  | `Artifact("g", "n", "v")`                                   | `Artifact`           |
+| jar 경로  | `jar("lib/x.jar")`, `jars("lib/*.jar")`                     | `JarFile`            |
+| 모듈      | `api(server.common.Module)`                                 | `Module`             |
+| 그룹 호출 | `Libs.spring("spring-boot-starter")`                        | `Group` → `Artifact` |
 
 ```kotlin
 sealed interface Dependency
@@ -308,53 +309,27 @@ Maven/Gradle 호환:
 data class Group(val id: String, val version: String? = null) {
     /** 그룹 안의 아티팩트. 버전을 생략하면 그룹 공용 버전, 그것도 없으면 platform(BOM)에서 온다. */
     operator fun invoke(name: String, version: String? = this.version): Artifact = Artifact(id, name, version)
-    /** 하위 그룹. Group("io.micronaut") / "data" == Group("io.micronaut.data") */
-    operator fun div(sub: String): Group = Group("$id.$sub", version)
-    /** 같은 ID, 다른 공용 버전 */
-    fun at(version: String): Group = copy(version = version)
 }
 ```
 
 ```kotlin
-// Libs.kt
+// Libs.kt — 위 Module.kt 예시가 쓰는 것만
 object Libs {
-    // 그룹 선언 — ID와 공용 버전을 여기서 한 번만
-    val kotlin   = Group("org.jetbrains.kotlin", "2.2.20")
-    val kotlinx  = Group("org.jetbrains.kotlinx")                 // 라이브러리마다 버전이 달라 공용 버전 없음
-    val spring   = Group("org.springframework.boot", "4.0.2")
-    val junit    = Group("org.junit.jupiter", "6.0.1")
-    val tc       = Group("org.testcontainers", "1.21.3")
-    val micronaut = Group("io.micronaut")
+    private val kotlin = Group("org.jetbrains.kotlin", "2.2.20")
+    private val kotlinx = Group("org.jetbrains.kotlinx")                  // 라이브러리마다 버전이 달라 공용 버전 없음
+    private val spring = Group("org.springframework.boot", "4.0.2")
 
-    // 아티팩트 — 그룹을 호출해서 만든다
-    object kotlinLibs {
-        val test = kotlin("kotlin-test")                           // 그룹 공용 버전 2.2.20
-    }
-    object kotlinxLibs {
-        val coroutines    = kotlinx("kotlinx-coroutines-core", "1.10.2")
-        val serialization = kotlinx("kotlinx-serialization-json", "1.9.0")
-        val io            = kotlinx("kotlinx-io-core", "0.8.0")
-    }
-    object springLibs {
-        val bom         = spring("spring-boot-dependencies")       // 4.0.2
-        val bootStarter = spring("spring-boot-starter")            // 4.0.2
-        val web         = spring("spring-boot-starter-web")        // 4.0.2
-    }
-    object junitLibs {
-        val jupiter = junit("junit-jupiter")
-        val legacy  = junit.at("5.13.4")("junit-jupiter-api")      // 한 아티팩트만 다른 버전
-    }
-    object tcLibs {
-        val postgresql = tc("postgresql")
-        val kafka      = tc("kafka")
-    }
-    object ksp {
-        val micronautData = (micronaut / "data")("micronaut-data-processor", "4.9.0")
-    }
+    val kotlinTest = kotlin("kotlin-test")                          // 2.2.20
+    val coroutines = kotlinx("kotlinx-coroutines-core", "1.10.2")
+    val serialization = kotlinx("kotlinx-serialization-json", "1.9.0")
+    val kotlinxIo = kotlinx("kotlinx-io-core", "0.8.0")
+    val springBom = spring("spring-boot-dependencies")             // 4.0.2
+    val springStarter = spring("spring-boot-starter")                  // 4.0.2
+    val junit = Artifact("org.junit.jupiter", "junit-jupiter", "6.0.1")          // 하나뿐이면 Group 없이
+    val tcPostgres = Artifact("org.testcontainers", "postgresql", "1.21.3")
+    val micronautDataKsp = Artifact("io.micronaut.data", "micronaut-data-processor", "4.9.0")
 }
 ```
-
-`Module.kt`에서는 `implementation(Libs.springLibs.web)`처럼 쓴다. 그룹 전체를 platform에 맡길 때는 그룹에 버전을 두지 않고 `platform(Libs.springLibs.bom)` 뒤에 `spring("spring-boot-starter-web")`처럼 버전 없이 호출하면 된다.
 
 그룹은 저장소 밖으로도 공유된다. 조직 공용 그룹 선언을 `module-libs` 아티팩트로 배포하면 각 저장소의 `Libs.kt`는 아티팩트 이름만 적는다.
 
@@ -362,9 +337,9 @@ object Libs {
 // kr.lul.mole:kmp-build 에 들어 있는 조직 공용 그룹 (배포된 A 단계 라이브러리)
 package kr.lul.mole.catalog
 object Groups {
-    val kotlin  = Group("org.jetbrains.kotlin", "2.2.20")
-    val spring  = Group("org.springframework.boot", "4.0.2")
-    val lul     = Group("kr.lul", "3.1.0")                        // 사내 공용 라이브러리 그룹
+    val kotlin = Group("org.jetbrains.kotlin", "2.2.20")
+    val spring = Group("org.springframework.boot", "4.0.2")
+    val lul = Group("kr.lul", "3.1.0")                                 // 사내 공용 라이브러리 그룹
 }
 ```
 
@@ -374,36 +349,33 @@ import kr.lul.mole.catalog.Groups
 
 object Libs {
     val kotlinTest = Groups.kotlin("kotlin-test")
-    val web        = Groups.spring("spring-boot-starter-web")
-    val lulCommon  = Groups.lul("common")
-    val lulAuth    = Groups.lul("auth-client")
-    val kafka      = Group("org.apache.kafka", "4.0.0")("kafka-clients")   // 저장소 고유 그룹은 로컬에서
+    val springStarter = Groups.spring("spring-boot-starter")
+    val lulCommon = Groups.lul("common")
 }
 ```
 
 버전을 올릴 때는 공용 그룹 아티팩트 한 번, 저장소는 `mole.toml`의 `module-libs` 버전 한 줄만 바꾼다. `--why`는 그 아티팩트가 어느 `Group` 선언에서 왔는지 소스 위치까지 보여 준다.
 
-기본은 이렇게 **Kotlin 코드(`*.kt`)** 다. 컴파일 단계 코드가 이미 Kotlin이므로 카탈로그도 같은 언어·같은 컴파일 단위에 두면 IDE 자동완성·리팩터링·참조 찾기가 그대로 통하고, `Group` 같은 타입도 쓸 수 있다.
+기본은 이렇게 **Kotlin 코드 (`*.kt`)** 다. 컴파일 단계 코드가 이미 Kotlin이므로 카탈로그도 같은 언어·같은 컴파일 단위에 두면 IDE 자동완성·리팩터링·참조 찾기가 그대로 통하고, `Group` 같은 타입도 쓸 수 있다.
 
-**TOML은 옵션**으로 허용한다. Gradle에서 옮겨오는 중이거나, 봇(Renovate/Dependabot)이 버전을 올려 주길 원하는 저장소를 위한 것이다. `mole.toml`에 한 줄 적으면 된다.
+**TOML은 옵션**으로 허용한다. Gradle에서 옮겨오는 중이거나, 봇 (Renovate/Dependabot)이 버전을 올려 주길 원하는 저장소를 위한 것이다. `mole.toml`에 한 줄 적으면 된다.
 
 ```toml
 [catalog]
 toml = ["gradle/libs.versions.toml"]      # 여러 개 가능
 ```
 
-엔진이 각 파일을 `build/generated/module/<이름>Toml.kt`로 변환해 컴파일 단계 단위에 합친다. `libs.versions.toml`이면 `object LibsToml`이 되고, `[versions]`·`[libraries]`·`[bundles]`·`[plugins]`가 각각 `v`·최상위 프로퍼티·`bundles`·`plugins`로 대응된다. 생성된 객체는 `Libs.kt`와 같은 타입(`Artifact`, `Group`)을 쓰므로 두 방식을 섞어도 된다.
+엔진이 각 파일을 `build/generated/module/<이름>Toml.kt`로 변환해 컴파일 단계 단위에 합친다. `libs.versions.toml`이면 `object LibsToml`이 되고, `[versions]`·`[libraries]`·`[bundles]`·`[plugins]`가 각각 `v`·최상위 프로퍼티·`bundles`·`plugins`로 대응된다. 생성된 객체는 `Libs.kt`와 같은 타입 (`Artifact`, `Group`)을 쓰므로 두 방식을 섞어도 된다.
 
 ```kotlin
 // Libs.kt — 직접 쓴 것과 TOML에서 온 것을 한곳에 모아 노출
 object Libs {
-    val spring = Group("org.springframework.boot", "4.0.2")
-    val web    = spring("spring-boot-starter-web")
-    val junit  = LibsToml.junit_jupiter                          // gradle/libs.versions.toml의 [libraries] junit-jupiter
+    val springStarter = Group("org.springframework.boot", "4.0.2")("spring-boot-starter")
+    val junit = LibsToml.junit_jupiter                   // gradle/libs.versions.toml의 [libraries] junit-jupiter
 }
 ```
 
-생성 코드는 읽기 전용이고 `--model`에 출처(`catalog: gradle/libs.versions.toml`)가 표시된다. TOML만 쓰는 저장소도 `Libs.kt` 없이 `LibsToml`을 바로 import 하면 된다.
+생성 코드는 읽기 전용이고 `--model`에 출처 (`catalog: gradle/libs.versions.toml`)가 표시된다. TOML만 쓰는 저장소도 `Libs.kt` 없이 `LibsToml`을 바로 import 하면 된다.
 
 ### 컴파일 단위와 순서
 
@@ -514,6 +486,7 @@ object Tasks : RootTasks() {
             if (run.ci) Report.sink.http(env("REPORT_URL")).send(report.summary())
         }
     }
+
     @JvmStatic
     fun main(args: Array<String>) = Mole.main(this, args)
 }
@@ -587,20 +560,20 @@ Fs.fingerprint(paths)                                                         //
 
 ### Gradle 대응표
 
-| Gradle                                     | mole                                     |
-|--------------------------------------------|------------------------------------------|
-| `build.gradle.kts` (모듈 루트)             | `Module.kt` (모듈 루트)                  |
-| `settings.gradle.kts` + wrapper            | `mole.toml` + `mole`                     |
-| `include(":a:b")`                          | 없음. `Module.kt`가 있는 디렉터리가 모듈 |
-| `project(":a:b")`                          | `a.b.Module` (import)                    |
+| Gradle                                     | mole                                       |
+|--------------------------------------------|--------------------------------------------|
+| `build.gradle.kts` (모듈 루트)             | `Module.kt` (모듈 루트)                    |
+| `settings.gradle.kts` + wrapper            | `mole.toml` + `mole`                       |
+| `include(":a:b")`                          | 없음. `Module.kt`가 있는 디렉터리가 모듈   |
+| `project(":a:b")`                          | `a.b.Module` (import)                      |
 | `libs.versions.toml`                       | `Libs.kt` (기본) 또는 TOML 가져오기 (옵션) |
-| `kotlin { jvm(); linuxX64() }`             | `targets { jvm(); linuxX64() }`          |
-| `sourceSets.jvmMain.dependencies { }`      | `sourceSets { jvmMain { } }`             |
-| 플러그인                                   | 타깃 확장(A) 또는 `Tasks.kt`(B)          |
-| `tasks.register { dependsOn() }`           | `seq { }` 안 순서                        |
-| `:a:b:jvmTest`                             | `a/b:jvm:test`                           |
-| `gradle dependencies`, `dependencyInsight` | `--deps`, `--why`                        |
-| 데몬, 빌드 캐시                            | 없음. 해시 up-to-date만                  |
+| `kotlin { jvm(); linuxX64() }`             | `targets { jvm(); linuxX64() }`            |
+| `sourceSets.jvmMain.dependencies { }`      | `sourceSets { jvmMain { } }`               |
+| 플러그인                                   | 타깃 확장(A) 또는 `Tasks.kt`(B)            |
+| `tasks.register { dependsOn() }`           | `seq { }` 안 순서                          |
+| `:a:b:jvmTest`                             | `a/b:jvm:test`                             |
+| `gradle dependencies`, `dependencyInsight` | `--deps`, `--why`                          |
+| 데몬, 빌드 캐시                            | 없음. 해시 up-to-date만                    |
 
 ## 디버깅
 
@@ -628,40 +601,43 @@ OrderServiceTest.calculatesTotal()               src/jvmTest/kotlin/OrderService
 실패의 1차 표현은 **예외 타입**이다. 모든 실패는 `MoleFailure`를 상속한 sealed 계층이고, 어느 단계에서 났는지가 타입에 들어 있다. 콘솔 출력·`summary.json`·IDE 디버거가 같은 타입을 본다. 프로세스 종료 코드는 따로 정의하지 않고 **예외 타입에서 유도**한다. 각 타입이 `exitCode`를 갖고, `main`은 잡은 예외의 그 값으로 종료한다. 코드 표를 외우는 대신 타입 계층을 보면 되고, 새 타입을 추가할 때 코드 충돌을 컴파일러가 잡아 준다.
 
 ```kotlin
-sealed class MoleFailure(val exitCode: Int, message: String, cause: Throwable? = null)
-    : RuntimeException(message, cause)
+sealed class MoleFailure(val exitCode: Int, message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 
-class BootstrapFailure(…)   : MoleFailure(3, …)          // 단계 —
+class BootstrapFailure(…) : MoleFailure(3, …)          // 단계 —
 
 sealed class StageAFailure(exitCode: Int, …) : MoleFailure(exitCode, …)   // A
-class ModuleDefError(…)     : StageAFailure(4, …)
-class CompileFailure(…)     : StageAFailure(5, …)
+class ModuleDefError(…) : StageAFailure(4, …)
+class CompileFailure(…) : StageAFailure(5, …)
 
 sealed class StageBFailure(exitCode: Int, …) : MoleFailure(exitCode, …)   // B
-class TestFailure(…)        : StageBFailure(6, …)
-class ProcessFailure(…)     : StageBFailure(7, …)
+class TestFailure(…) : StageBFailure(6, …)
+class ProcessFailure(…) : StageBFailure(7, …)
 class EnvironmentFailure(…) : StageBFailure(8, …)
-class AutomationError(…)    : StageBFailure(1, …)        // 태스크 코드가 던진 그 밖의 예외를 감쌈
+class AutomationError(…) : StageBFailure(1, …)        // 태스크 코드가 던진 그 밖의 예외를 감쌈
 
 // Mole.main
 fun main(root: Tasks, args: Array<String>) {
     exitProcess(
-        try { Run(root, args).execute(); 0 }
-        catch (f: MoleFailure) { report.failure(f); f.exitCode }
-        catch (t: Throwable)   { report.failure(AutomationError(t)); 1 }   // 분류 안 된 예외는 전부 1
+        try {
+            Run(root, args).execute(); 0
+        } catch (f: MoleFailure) {
+            report.failure(f); f.exitCode
+        } catch (t: Throwable) {
+            report.failure(AutomationError(t)); 1
+        }   // 분류 안 된 예외는 전부 1
     )
 }
 ```
 
-| 예외                 | 단계 | exit | 뜻                                                                          |
-|----------------------|------|------|-----------------------------------------------------------------------------|
-| `BootstrapFailure`   | —    | 3    | JDK 없음, 엔진·확장 확보 실패, `mole.toml` 오류                             |
+| 예외                 | 단계 | exit | 뜻                                                                                       |
+|----------------------|------|------|------------------------------------------------------------------------------------------|
+| `BootstrapFailure`   | —    | 3    | JDK 없음, 엔진·확장 확보 실패, `mole.toml` 오류                                          |
 | `ModuleDefError`     | A    | 4    | 모듈 루트 `*.kt` 컴파일·실행 실패, 패키지≠경로, 타입 불일치, 순환 의존, 의존성 해석 실패 |
-| `CompileFailure`     | A    | 5    | 소스셋 컴파일 실패 (타깃·소스셋 표기)                                       |
-| `TestFailure`        | B    | 6    | 테스트 실패 (타깃 표기)                                                     |
-| `ProcessFailure`     | B    | 7    | 외부 프로세스 비정상 종료. 재현 명령 포함                                   |
-| `EnvironmentFailure` | B    | 8    | Docker, konan 툴체인, node 부재                                             |
-| `AutomationError`    | B    | 1    | 태스크 코드 예외, 분류되지 않은 모든 예외                                   |
+| `CompileFailure`     | A    | 5    | 소스셋 컴파일 실패 (타깃·소스셋 표기)                                                    |
+| `TestFailure`        | B    | 6    | 테스트 실패 (타깃 표기)                                                                  |
+| `ProcessFailure`     | B    | 7    | 외부 프로세스 비정상 종료. 재현 명령 포함                                                |
+| `EnvironmentFailure` | B    | 8    | Docker, konan 툴체인, node 부재                                                          |
+| `AutomationError`    | B    | 1    | 태스크 코드 예외, 분류되지 않은 모든 예외                                                |
 
 CI 스크립트는 종료 코드로 A/B를 가르고 (`3–5`면 빌드툴·설정, `6`이면 테스트, 나머지 B는 자동화), 사람은 `summary.json`의 예외 타입과 스택을 본다. 같은 정보를 두 소비자에 맞게 렌더링한 것이다.
 
@@ -703,18 +679,18 @@ steps:
 
 ## 규칙
 
-| 하지 마세요                            | 대신                                                   |
-|----------------------------------------|--------------------------------------------------------|
-| `Module.kt`에서 프로젝트 소스 참조     | 구조상 불가. 다른 모듈의 `Module`은 허용               |
+| 하지 마세요                            | 대신                                                            |
+|----------------------------------------|-----------------------------------------------------------------|
+| `Module.kt`에서 프로젝트 소스 참조     | 구조상 불가. 다른 모듈의 `Module`은 허용                        |
 | `object Module`을 `src/` 아래에 두기   | 모듈 루트의 `*.kt`. 경로 = 패키지인 `object Module`이 모듈 판정 |
-| 모듈 의존을 문자열 경로로              | `api(server.common.Module)`                            |
-| 타깃 확장 외의 방식으로 A 확장         | B의 `Tasks.kt`                                         |
-| 관례 태스크를 무시하고 처음부터 재작성 | `ModuleTasks(Module)` 상속 후 필요한 노드만 `override` |
-| `seq` 본문에서 직접 스레드·코루틴      | `parallel`/`race`                                      |
-| `System.out`                           | `io.out`                                               |
-| JVM 테스트를 fork                      | in-process. 격리 필요 시 `Proc.java`                   |
-| native/js 코드를 자동화에서 import     | 불가(JVM). 산출물을 `Proc.run`                         |
-| 태스크 정의를 `if`로 감싸기            | 정의 고정, 분기는 `run.ci`                             |
+| 모듈 의존을 문자열 경로로              | `api(server.common.Module)`                                     |
+| 타깃 확장 외의 방식으로 A 확장         | B의 `Tasks.kt`                                                  |
+| 관례 태스크를 무시하고 처음부터 재작성 | `ModuleTasks(Module)` 상속 후 필요한 노드만 `override`          |
+| `seq` 본문에서 직접 스레드·코루틴      | `parallel`/`race`                                               |
+| `System.out`                           | `io.out`                                                        |
+| JVM 테스트를 fork                      | in-process. 격리 필요 시 `Proc.java`                            |
+| native/js 코드를 자동화에서 import     | 불가(JVM). 산출물을 `Proc.run`                                  |
+| 태스크 정의를 `if`로 감싸기            | 정의 고정, 분기는 `run.ci`                                      |
 
 ## FAQ
 
@@ -749,7 +725,7 @@ steps:
 
 - 1차는 `jvm` 확장으로 두 단계 구조·관례 태스크·투명성 명령을 완성한다.
 - 이후 `native`(linux/macos/mingw/ios/watchos/tvos), `js`, `wasmJs`/`wasmWasi`, Android까지 **KMP가 지원하는 나머지 모든 타깃 확장**을 갖춘다. 목표는 어느 타깃이든 `--model`·`--explain`·`--trace`·`--why`가 같은 깊이로 나오는 것 — 즉 모든 플랫폼에서 같은 빌드 투명성.
-- 타깃별 테스트 러너(테스트 바이너리, node, 브라우저, 시뮬레이터)의 결과를 하나의 `TestResult`로 회수.
+- 타깃별 테스트 러너 (테스트 바이너리, node, 브라우저, 시뮬레이터)의 결과를 하나의 `TestResult`로 회수.
 - iOS framework·Xcode 연동, Android AAR·리소스 병합.
 
 **빌드 시스템**
@@ -761,7 +737,7 @@ steps:
 
 **자동화 확장 (`sys` 계열)**
 
-- **IaC**: 인프라 정의를 `Tasks.kt`와 같은 JVM·같은 타입 시스템으로 다루는 확장. Terraform/OpenTofu·Pulumi 같은 외부 도구를 `Proc.run`으로 감싸는 1차와, 클라우드 SDK를 직접 호출하는 2차. 계획(plan)과 적용(apply)을 `--dry-run`/`--explain`과 같은 모델로 보여 주는 것이 목표.
+- **IaC**: 인프라 정의를 `Tasks.kt`와 같은 JVM·같은 타입 시스템으로 다루는 확장. Terraform/OpenTofu·Pulumi 같은 외부 도구를 `Proc.run`으로 감싸는 1차와, 클라우드 SDK를 직접 호출하는 2차. 계획 (plan)과 적용 (apply)을 `--dry-run`/`--explain`과 같은 모델로 보여 주는 것이 목표.
 - **컨테이너·배포**: 이미지 빌드 (Jib Core), 레지스트리 푸시, Kubernetes 매니페스트 적용, 롤아웃 대기·롤백을 태스크로.
 - **시크릿**: Vault·클라우드 시크릿 매니저에서 읽어 `run.env`에 주입하고 `--trace`에는 마스킹.
 - **릴리스**: 버전 계산, changelog, Maven Central·npm 배포, Git 태그.
