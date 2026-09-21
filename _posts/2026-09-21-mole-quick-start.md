@@ -13,11 +13,13 @@ Gradle로 Kotlin Multiplatform 프로젝트를 굴리다 보면 반복해서 부
 - 빌드 스크립트와 프로젝트 코드가 따로 논다. 태스크 안에서 테스트 픽스처를 재사용하고 싶어도 쉽지 않고, 브레이크포인트를 걸어도 태스크 정의가 콜스택에 안 보인다.
 - `dependsOn`, `mustRunAfter`, 플러그인이 등록하는 태스크… 무엇이 어떤 순서로 도는지 추적하려면 `--scan`을 켜야 한다.
 
-그래서 우선순위를 뒤집어 봤다. **태스크 자동화 프레임워크가 목표이고, 빌드 시스템은 그 위에 올린 핵심 솔루션**이다. 빌드 설정 (`Module.kt`)과 태스크 자동화 코드가 한 프로젝트에 공존해도 되고 어느 한쪽만 있어도 된다. 전부 하나의 JVM에서 실행·디버깅되고, 테스트 코드 브레이크포인트의 콜스택에 태스크 정의가 보인다.
+그래서 우선순위를 뒤집어 봤다. **태스크 자동화 프레임워크가 목표이고, 빌드 시스템은 그 위에 올린 핵심 솔루션**이다. 빌드 설정 (`Module.kt`)과 태스크 자동화 코드 (`Tasks.kt`)가 한 프로젝트에 공존해도 되고 어느 한쪽만 있어도 된다. 전부 하나의 JVM에서 실행·디버깅되고, 테스트 코드 브레이크포인트의 콜스택에 태스크 정의가 보인다.
 
-## 구성
+설계의 출발점이 된 요구는 글 끝의 [요구조건](#요구조건) 표에 R1 같은 번호로 정리했다. 본문은 그 번호로 참조한다.
 
-### 두 층
+## 전체 그림
+
+### 두 층 — 자동화가 목표, 빌드는 그 위의 솔루션
 
 ```mermaid
 flowchart TB
@@ -49,7 +51,7 @@ flowchart TB
 | **타깃 확장**       | build의 타깃별 컴파일러·테스트 러너                                                               | `mole.toml`의 `extensions` | build를 안 쓰면 불필요                                                      |
 | **기본 확장 `sys`** | 서드파티를 끄는 편의 래핑(Testcontainers, Flyway, Http, Git)                                      | `mole.toml`의 `extensions` | 직접 의존성으로 대체 가능                                                   |
 
-세 가지 프로젝트 형태가 모두 정상이다.
+그래서 세 가지 프로젝트 형태가 모두 정상이다 (R18).
 
 | 형태          | 파일                                    | 예                                                                  |
 |---------------|-----------------------------------------|---------------------------------------------------------------------|
@@ -57,17 +59,17 @@ flowchart TB
 | 빌드만        | `Project.kt` + `Module.kt`              | 라이브러리 저장소. `./mole build`, `./mole test`로 충분             |
 | 자동화만      | `Project.kt` + `Tasks.kt`               | 운영 자동화, 인프라 작업, 데이터 파이프라인. `Module.kt` 없음       |
 
-### 두 단계
+### 두 단계 — A 컴파일, B 자동화
 
-빌드 시스템을 쓰는 프로젝트에서 실행은 두 단계로 나뉜다. 자동화만 쓰는 프로젝트는 B만 있다.
+빌드 시스템을 쓰는 프로젝트에서 실행은 두 단계로 나뉜다 (R5). 자동화만 쓰는 프로젝트는 B만 있다.
 
-|             | A. 컴파일 단계                                                                          | B. 자동화 단계                                                                                      |
-|-------------|-----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
-| 코드 위치   | **루트의 `*.kt`** (`Project.kt`, `Presets.kt`, `Libs.kt`) **+ 각 모듈 루트의 `Module.kt`** — 하나의 컴파일 단위 | 루트와 각 모듈의 `src/mole/kotlin` 소스셋                                              |
-| import 가능 | 엔진 코어 + 활성 확장의 `module` API + `Project`·루트 `*.kt` + 의존 모듈의 `Module`     | `jvmTest` + `jvmMain` + `commonMain` + 자기·의존 모듈의 `Module`·`Tasks` + 엔진 `task` API |
-| 정하는 것   | 버전 카탈로그, 저장소 공용 프리셋, 타깃, 소스셋별 의존성, 컴파일러 옵션, KSP/APT, 생성 소스 | 태스크 트리 (관례 태스크의 참조·재정의·확장)                                           |
-| 확장 방식   | 타깃 확장 (엔진과 함께 배포) + 루트 `*.kt` (저장소 로컬 프리셋)                         | 일반 코드                                                                              |
-| 실행 환경   | JVM                                                                                     | JVM. native/js 산출물은 프로세스로 실행                                                |
+|             | A. 컴파일 단계                                                                                                  | B. 자동화 단계                                                                             |
+|-------------|-----------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------|
+| 코드 위치   | **루트의 `*.kt`** (`Project.kt`, `Presets.kt`, `Libs.kt`) **+ 각 모듈 루트의 `Module.kt`** — 하나의 컴파일 단위 | 루트와 각 모듈의 `src/mole/kotlin` 소스셋                                                  |
+| import 가능 | 엔진 코어 + 활성 확장의 `module` API + `Project`·루트 `*.kt` + 의존 모듈의 `Module`                             | `jvmTest` + `jvmMain` + `commonMain` + 자기·의존 모듈의 `Module`·`Tasks` + 엔진 `task` API |
+| 정하는 것   | 버전 카탈로그, 저장소 공용 프리셋, 타깃, 소스셋별 의존성, 컴파일러 옵션, KSP/APT, 생성 소스                     | 태스크 트리 (관례 태스크의 참조·재정의·확장)                                               |
+| 확장 방식   | 타깃 확장 (엔진과 함께 배포) + 루트 `*.kt` (저장소 로컬 프리셋)                                                 | 일반 코드                                                                                  |
+| 실행 환경   | JVM                                                                                                             | JVM. native/js 산출물은 프로세스로 실행                                                    |
 
 역할 분담은 한 줄이다. **`Module.kt`는 `kr.lul.mole:kmp-build`가 프로젝트를 컴파일하는 데 필요한 것만 적고, 그 외의 모든 자동화는 `Tasks.kt`가 한다.** `kmp-build`는 `Project.kt`·루트 `*.kt`·모든 `Module.kt`를 설정 파일로 보고 한 번에 컴파일하므로 셋 사이에 순서는 없다. A는 Gradle이 관례로 해주던 것의 최소 집합이고, B는 플러그인·태스크로 하던 것 전부다. A의 확장점은 타깃 확장과 루트 `*.kt` 둘뿐이다.
 
@@ -88,7 +90,9 @@ B는 다시 두 층으로 읽을 수 있다. **기본 자동화**는 A의 결과
 
 권장하지 않는 이유는 기술이 아니라 인지 부담이다. 한 저장소 안에서 같은 코드가 "실행되는 태스크"이면서 "컴파일을 정하는 라이브러리"이면, 실패 원인을 A/B로 가르는 첫 분류 (R1)가 무너진다. 저장소 안에서 공유하는 프리셋은 루트 `*.kt`에 두고, 저장소 밖으로 공유하는 프리셋은 별도 저장소로 분리해 버전을 붙여 배포한다.
 
-## 설치
+## 시작하기
+
+### 설치
 
 ```bash
 cd my-project
@@ -118,9 +122,13 @@ local = true                                  # ~/.m2
 libs = ["kr.lul.mole:kmp-build:0.5.0"]
 ```
 
+엔진은 부트스트랩 스크립트가 다운로드하고, Maven 아티팩트로도 공유된다 (R12). 요구사항은 JDK 21+.
+
 Gradle 대응: `mole.toml` ≈ `gradle-wrapper.properties` + `settings.gradle.kts`의 `pluginManagement`. 모듈 목록 (`include`)은 없다. 디렉터리가 곧 모듈이다.
 
-자동화만 쓰는 프로젝트는 `extensions = []`로 두고 `Module.kt` 없이 `Project.kt`와 `Tasks.kt`만 둔다.
+### 가장 작은 예 — 자동화만 쓰는 프로젝트
+
+`extensions = []`로 두고 `Module.kt` 없이 `Project.kt`와 `Tasks.kt`만 둔다.
 
 ```kotlin
 // Project.kt — 자동화 전용 프로젝트
@@ -146,9 +154,11 @@ object Tasks : RootTasks() {
 }
 ```
 
-`./mole nightly`. A 단계는 `Project.kt`만 컴파일하고, 모듈이 없으니 바로 B로 넘어간다. 요구사항은 JDK 21+.
+`./mole nightly`. A 단계는 `Project.kt`만 컴파일하고, 모듈이 없으니 바로 B로 넘어간다.
 
 ## 프로젝트 구조
+
+### 디렉터리 = 모듈
 
 ```text
 my-project/                          ← 루트 (object Project, 기본 패키지. 모듈이 아님)
@@ -178,15 +188,19 @@ my-project/                          ← 루트 (object Project, 기본 패키�
   build/                             ← 산출물 (gitignore)
 ```
 
-규칙:
-
-- **루트의 `mole` 스크립트 기준 상대 경로를 패키지로 갖고, `Module` 타입을 상속한 `object Module`이 있으면 그 디렉터리가 모듈**이다. 세 조건이 전부 맞아야 한다: ① 이름이 `Module`인 `object`, ② 패키지 = 상대 경로, ③ 엔진의 `mole.module.Module`(또는 그 하위 `KmpModule`/`JvmModule`…)을 상속. `server/domain/`은 `package server.domain`의 `object Module : KmpModule()`이 있을 때 모듈이 된다. 루트는 모듈이 아니라 기본 패키지의 `object Project`이며, 저장소에 하나뿐이다. 조건이 맞는 객체가 없는 디렉터리는 그룹 (경로만 제공). `src/` 유무는 무관하다.
+- **루트의 `mole` 스크립트 기준 상대 경로를 패키지로 갖고, `Module` 타입을 상속한 `object Module`이 있으면 그 디렉터리가 모듈**이다 (R10). 세 조건이 전부 맞아야 한다: ① 이름이 `Module`인 `object`, ② 패키지 = 상대 경로, ③ 엔진의 `mole.module.Module`(또는 그 하위 `KmpModule`/`JvmModule`…)을 상속. `server/domain/`은 `package server.domain`의 `object Module : KmpModule()`이 있을 때 모듈이 된다. 조건이 맞는 객체가 없는 디렉터리는 그룹 (경로만 제공). `src/` 유무는 무관하다.
+- 루트는 모듈이 아니라 기본 패키지의 `object Project`이며, 저장소에 하나뿐이다.
 - 엔진은 디렉터리 경로에서 FQN `server.domain.Module`을 유도해 로드한다 (클래스패스 스캔 없음). 로드한 객체가 `mole.module.Module`의 인스턴스인지 확인하고, 아니면 그 디렉터리는 모듈이 아니다 — 우연히 이름만 `Module`인 객체가 모듈로 오인되는 것을 막는다. 파일 이름은 관례상 `Module.kt`를 쓰지만 판정에는 쓰이지 않는다. 패키지가 경로와 다르거나 타입이 맞지 않는 객체를 다른 곳에서 `api(...)`로 넘기면 `ModuleDefError`.
 - 모듈 간 의존은 **import 한 `Module` 객체를 넘기는 것**으로 표현한다. `api(server.common.Module)`. 문자열 경로 없음.
-- 소스셋은 KMP Gradle 관례 그대로: `src/<sourceSet>/kotlin`, `src/<sourceSet>/resources`.
-- 루트의 `*.kt` (`Project.kt`, `Presets.kt`, `Libs.kt`)와 모든 `Module.kt`는 하나의 A 컴파일 단위다. `Module.kt`는 `Project`, 루트의 다른 `*.kt`, 의존 모듈의 `Module`을 import 한다.
-- `src/mole`은 JVM 소스셋이며 자동화 전용이다. 자기 `Module`, 의존 모듈의 `Tasks`, 그리고 그 모듈에 `jvm` 타깃이 있으면 `jvmTest → jvmMain → commonMain`을 본다. `commonTest`는 TODO다 — 지금은 `jvm` 타깃이 있을 때 `jvmTest` 컴파일에 딸려 오는 것만 보인다. `jvm` 타깃이 없으면 엔진 API만 보고 native/js는 산출물로 다룬다.
+- 소스셋은 KMP Gradle 관례 그대로 (R9): `src/<sourceSet>/kotlin`, `src/<sourceSet>/resources`.
 - 태스크 주소 = 모듈 경로 `:` 타깃 `:` 태스크. `server/domain:jvm:test`, `cli:linuxX64:link`, 집계는 `server/domain:test`, 루트는 `ci`.
+
+### 컴파일 단위와 순서
+
+- 저장소 안 **루트의 `*.kt` (`Project.kt`, `Presets.kt`, `Libs.kt`)와 모든 모듈 루트의 `Module.kt`는 하나의 A 컴파일 단위**다. 모듈 그래프는 `Module.kt`가 정의하므로 컴파일 전에 알 수 없고, 따라서 `Project`·`Presets`·어느 `Module`이든 서로 import 할 수 있다. 순환 의존은 로드 후 그래프 검사에서 `ModuleDefError`.
+- A의 클래스패스: 엔진 코어 + 활성 확장 `module` API + `module-libs`. 프로젝트 소스는 보이지 않는다.
+- 이후 모듈 그래프 위상 순서로 타깃별 컴파일: `commonMain` metadata → 각 타깃 main → 각 타깃 test → `src/mole`. 루트 `src/mole`은 모든 모듈 뒤에 온다.
+- `src/mole`은 JVM 소스셋이며 자동화 전용이다. 자기 `Module`, 의존 모듈의 `Tasks`, 그리고 그 모듈에 `jvm` 타깃이 있으면 `jvmTest → jvmMain → commonMain`을 본다 (R6). `commonTest`는 TODO다 — 지금은 `jvm` 타깃이 있을 때 `jvmTest` 컴파일에 딸려 오는 것만 보인다. `jvm` 타깃이 없으면 엔진 API만 보고 native/js는 산출물로 다룬다.
 
 ```mermaid
 flowchart LR
@@ -278,7 +292,7 @@ object Module : KmpModule() {
 }
 ```
 
-타깃이 하나뿐인 모듈은 `JvmModule`/`JsModule`/`NativeModule`을 쓰면 `commonMain` 대신 `main`/`test` 소스셋 이름을 쓴다.
+타깃이 하나뿐인 모듈은 `JvmModule`/`JsModule`/`NativeModule`을 쓰면 `commonMain` 대신 `main`/`test` 소스셋 이름을 쓴다. 코드 생성 (KSP/APT/빌드 상수)은 `generate { }`·`ksp`로 컴파일 입력이 된다 (R15).
 
 `Presets`는 루트에 둔 저장소 공용 코드다. `Project.kt`·`Module.kt`와 같은 A 컴파일 단위라 모든 모듈이 import 할 수 있다.
 
@@ -292,7 +306,7 @@ object Presets {
 
 ### 의존성 표기
 
-모든 스코프 함수가 다섯 형태를 받는다. `Group`은 의존성이 아니라 의존성을 만드는 팩토리다.
+모든 스코프 함수가 다섯 형태를 받는다 (R7). `Group`은 의존성이 아니라 의존성을 만드는 팩토리다.
 
 | 형태      | 예                                                          | 타입                 |
 |-----------|-------------------------------------------------------------|----------------------|
@@ -327,7 +341,7 @@ Maven/Gradle 호환:
 
 ### 버전 카탈로그 — `Project.versionCatalog`
 
-루트의 `Project.kt`는 저장소 전체의 정의다. 모듈이 아니므로 타깃·소스셋이 없고, **버전 카탈로그 인스턴스**와 루트 `src/mole` (루트 자동화)의 의존성을 정한다.
+루트의 `Project.kt`는 저장소 전체의 정의다. 모듈이 아니므로 타깃·소스셋이 없고, **버전 카탈로그 인스턴스** (R8)와 루트 `src/mole` (루트 자동화)의 의존성을 정한다.
 
 ```kotlin
 // 엔진 API (mole.module)
@@ -418,12 +432,6 @@ object Groups {
 
 **TOML은 옵션**으로 허용한다. Gradle에서 옮겨오는 중이거나, 봇 (Renovate/Dependabot)이 버전을 올려 주길 원하는 저장소를 위한 것이다. `versionCatalog { toml("gradle/libs.versions.toml") }` 한 줄이면 `[versions]`·`[libraries]`·`[bundles]`가 같은 인스턴스에 합쳐지고 별칭은 TOML 키 그대로다 (`Project.versionCatalog["junit-jupiter"]`). `[plugins]`는 대응 개념이 없어 무시한다. 코드로 적은 것과 TOML에서 온 것이 같은 타입 (`Artifact`, `Group`)이므로 섞어도 되고, `--model`에 각 항목의 출처 (`Project.kt:12`, `catalog: gradle/libs.versions.toml`)가 표시된다. TOML만 쓰는 저장소는 `Project.kt`에 `toml(...)` 한 줄만 있으면 된다.
 
-### 컴파일 단위와 순서
-
-- 저장소 안 **루트의 `*.kt`와 모든 모듈 루트의 `*.kt`는 하나의 컴파일 단위**다. 모듈 그래프는 `Module.kt`가 정의하므로 컴파일 전에 알 수 없고, 따라서 `Project`·`Presets`·어느 `Module`이든 서로 import 할 수 있다. 순환 의존은 로드 후 그래프 검사에서 `ModuleDefError`.
-- 클래스패스: 엔진 코어 + 활성 확장 `module` API + `module-libs`. 프로젝트 소스는 보이지 않는다.
-- 이후 모듈 그래프 위상 순서로 타깃별 컴파일: `commonMain` metadata → 각 타깃 main → 각 타깃 test → `src/mole`. 루트 `src/mole`은 모든 모듈 뒤에 온다.
-
 ## B. 자동화 단계 — `src/mole/kotlin`
 
 이 절이 mole-core다. 빌드가 없는 프로젝트에서는 관례 태스크만 비어 있고 나머지는 같다.
@@ -494,21 +502,10 @@ object Tasks : ModuleTasks(Module) {                 // 관례 트리 상속
 
 `ModuleTasks(Module)`이 관례 트리를 만들고, `override`가 같은 주소를 대체한다. `--tree`는 재정의된 노드에 `(overridden in Tasks.kt:12)`를 붙인다.
 
-### 정의 순서 = 실행 순서 = 의존 순서
-
-`after`/`dependsOn`이 없다. 컨테이너 안에서 앞 태스크가 뒤 태스크의 선행이다. 순서는 **프로퍼티 초기화 순서**에서 얻는다 (`task { }`가 초기화 중 부모에 등록). 한 Run 안에서 같은 태스크는 한 번만 실행된다. `--only`로 선행을 건너뛴다.
-
-| 컨테이너         | 자식   | 실행                  | 성공                                         | 콜스택                    |
-|------------------|--------|-----------------------|----------------------------------------------|---------------------------|
-| `seq { }` (기본) | `List` | 순서대로, 같은 스레드 | 모두 (AND)                                   | 보존                      |
-| `firstOf { }`    | `List` | 순서대로              | 하나 성공 시 종료 (OR), 앞선 실패 `absorbed` | 보존                      |
-| `parallel { }`   | `Set`  | 스레드별 동시         | 모두                                         | 스레드별 + 부모 스택 캡처 |
-| `race { }`       | `Set`  | 스레드별 동시         | 하나 성공 시 나머지 interrupt                | 스레드별                  |
-
-순서가 의미 있으면 `List`, 없으면 `Set`. 관례 `test` 집계가 `parallel`인 이유는 타깃 간 순서가 없기 때문이다.
+루트 `src/mole`은 모든 모듈 뒤에 컴파일되므로 어느 모듈의 `Tasks`든 import 해서 저장소 전체를 묶는다.
 
 ```kotlin
-// 루트 src/mole/kotlin/Tasks.kt — 모든 모듈 뒤에 컴파일되므로 어느 모듈의 Tasks든 import 한다
+// 루트 src/mole/kotlin/Tasks.kt
 import server.domain.Tasks as domain
 import cli.Tasks as cli
 import web.Tasks as web
@@ -533,15 +530,28 @@ object Tasks : RootTasks() {
 }
 ```
 
-동시성은 `java.util.concurrent`만 (`invokeAll`/`invokeAny`, 이름 붙인 플랫폼 스레드). kotlinx.coroutines는 자동화 코드에서 쓰지 않는다.
+### 정의 순서 = 실행 순서 = 의존 순서
+
+`after`/`dependsOn`이 없다 (R3). 컨테이너 안에서 앞 태스크가 뒤 태스크의 선행이다. 순서는 **프로퍼티 초기화 순서**에서 얻는다 (`task { }`가 초기화 중 부모에 등록). 한 Run 안에서 같은 태스크는 한 번만 실행된다. `--only`로 선행을 건너뛴다.
+
+| 컨테이너         | 자식   | 실행                  | 성공                                         | 콜스택                    |
+|------------------|--------|-----------------------|----------------------------------------------|---------------------------|
+| `seq { }` (기본) | `List` | 순서대로, 같은 스레드 | 모두 (AND)                                   | 보존                      |
+| `firstOf { }`    | `List` | 순서대로              | 하나 성공 시 종료 (OR), 앞선 실패 `absorbed` | 보존                      |
+| `parallel { }`   | `Set`  | 스레드별 동시         | 모두                                         | 스레드별 + 부모 스택 캡처 |
+| `race { }`       | `Set`  | 스레드별 동시         | 하나 성공 시 나머지 interrupt                | 스레드별                  |
+
+순서가 의미 있으면 `List`, 없으면 `Set`. 관례 `test` 집계가 `parallel`인 이유는 타깃 간 순서가 없기 때문이다.
+
+동시성은 `java.util.concurrent`만 (`invokeAll`/`invokeAny`, 이름 붙인 플랫폼 스레드) (R14). kotlinx.coroutines는 자동화 코드에서 쓰지 않는다.
 
 ### 입출력
 
-`Task<I, O>`, `pipe { a then b then c }`. 관례 태스크도 값을 반환한다 (`jvm.jar()` → `Path`, `linuxX64.link.release()` → `Path`, `jvm.test()` → `TestResult`). 터미널 IO는 `IO(stdin, out, err)`로 Run에 주입되고 태스크는 `io.out`을 쓴다. `parallel` 자식은 `[server/domain:jvm:test]` 프리픽스, `Proc.run`은 자식 프로세스에 연결.
+`Task<I, O>`, `pipe { a then b then c }` (R4). 관례 태스크도 값을 반환한다 (`jvm.jar()` → `Path`, `linuxX64.link.release()` → `Path`, `jvm.test()` → `TestResult`). 터미널 IO는 `IO(stdin, out, err)`로 Run에 주입되고 태스크는 `io.out`을 쓴다. `parallel` 자식은 `[server/domain:jvm:test]` 프리픽스, `Proc.run`은 자식 프로세스에 연결.
 
 ### core 기본 기능 — `Proc`, `Fs`
 
-시스템 커맨드 실행과 파일 시스템 조작은 **mole-core에 포함**한다. 모든 자동화 프로젝트가 쓰고, 빌드 층 자체가 native/js 툴체인 호출에 쓰며, JDK만으로 구현되기 때문이다 (`ProcessBuilder`, `java.nio.file`). 서드파티를 끄는 것 (Testcontainers, Flyway)은 기본 확장 `sys`로 분리한다.
+시스템 커맨드 실행과 파일 시스템 조작은 **mole-core에 포함**한다 (R13). 모든 자동화 프로젝트가 쓰고, 빌드 층 자체가 native/js 툴체인 호출에 쓰며, JDK만으로 구현되기 때문이다 (`ProcessBuilder`, `java.nio.file`). 서드파티를 끄는 것 (Testcontainers, Flyway)은 기본 확장 `sys`로 분리한다.
 
 ```kotlin
 val r = Proc.run(
@@ -568,12 +578,12 @@ Proc.start(...)                               // 백그라운드. run.onClose에
 val f = file("build/out/app.json")            // 모듈 디렉터리 기준. root("...")는 저장소 루트 기준
 f.exists(); f.isDir(); f.size(); f.mtime(); f.sha256()
 
-Fs.write(f, text) Fs . read (f) Fs . append (f, text)
-Fs.copy(src, dst) Fs . move (src, dst)      Fs.delete(f)                // 디렉터리는 재귀
-Fs.mkdirs(dir) Fs . list (dir) Fs . glob ("src/**/*.kt")
+Fs.write(f, text); Fs.read(f); Fs.append(f, text)
+Fs.copy(src, dst); Fs.move(src, dst); Fs.delete(f)                            // 디렉터리는 재귀
+Fs.mkdirs(dir); Fs.list(dir); Fs.glob("src/**/*.kt")
 Fs.sync(srcDir, dstDir, delete = true)                                        // 변경분만 복사
 Fs.temp("prefix") { dir -> … }                                                // Run 종료 시 삭제
-Fs.zip(dir, target) Fs . unzip (archive, dir)
+Fs.zip(dir, target); Fs.unzip(archive, dir)
 Fs.watch(dir) { changes -> … }
 Fs.fingerprint(paths)                                                         // up-to-date 판정용 해시
 ```
@@ -582,9 +592,11 @@ Fs.fingerprint(paths)                                                         //
 - `--dry-run`이면 `Fs`의 쓰기 조작과 `Proc.run`은 기록만 하고 실행하지 않는다. 읽기는 실행한다.
 - 경로는 `java.nio.file.Path`다. 별도 타입을 만들지 않는다.
 
-## 투명성
+## 실행과 관찰
 
-관례가 결정한 것은 전부 출력할 수 있어야 한다. 숨은 상태가 없다는 것이 "빌드·자동화 도구와 통합된 프로젝트의 투명성"의 정의다.
+### 투명성
+
+관례가 결정한 것은 전부 출력할 수 있어야 한다 (R17). 숨은 상태가 없다는 것이 "빌드·자동화 도구와 통합된 프로젝트의 투명성"의 정의다.
 
 | 명령                            | 보여주는 것                                                                                   |
 |---------------------------------|-----------------------------------------------------------------------------------------------|
@@ -599,28 +611,9 @@ Fs.fingerprint(paths)                                                         //
 
 이 출력들은 같은 모델 객체 (`mole.model.Project`)를 다르게 렌더링한 것이다.
 
-### Gradle 대응표
+### 디버깅
 
-| Gradle                                     | mole                                       |
-|--------------------------------------------|--------------------------------------------|
-| `build.gradle.kts` (모듈 루트)             | `Module.kt` (모듈 루트)                    |
-| `build.gradle.kts` (루트)                  | `Project.kt`                               |
-| `settings.gradle.kts` + wrapper            | `mole.toml` + `mole`                       |
-| `buildSrc`                                 | 루트 `*.kt` (`Presets.kt`)                 |
-| `include(":a:b")`                          | 없음. `Module.kt`가 있는 디렉터리가 모듈   |
-| `project(":a:b")`                          | `a.b.Module` (import)                      |
-| `libs.versions.toml`                       | `Project.versionCatalog` (코드 기본, TOML 가져오기 옵션) + `Libs.kt` 별칭 (옵션) |
-| `kotlin { jvm(); linuxX64() }`             | `targets { jvm(); linuxX64() }`            |
-| `sourceSets.jvmMain.dependencies { }`      | `sourceSets { jvmMain { } }`               |
-| 플러그인                                   | 타깃 확장(A) 또는 `Tasks.kt`(B)            |
-| `tasks.register { dependsOn() }`           | `seq { }` 안 순서                          |
-| `:a:b:jvmTest`                             | `a/b:jvm:test`                             |
-| `gradle dependencies`, `dependencyInsight` | `--deps`, `--why`                          |
-| 데몬, 빌드 캐시                            | 없음. 해시 up-to-date만                    |
-
-## 디버깅
-
-`./mole idea`가 `--model`과 같은 데이터로 IntelliJ 프로젝트 파일을 생성한다. `Tasks.kt`의 `main` 거터 ▶ Debug. 기대되는 콜스택은 이렇다.
+`./mole idea`가 `--model`과 같은 데이터로 IntelliJ 프로젝트 파일을 생성한다 (R11). `Tasks.kt`의 `main` 거터 ▶ Debug. 기대되는 콜스택은 이렇다 (R2).
 
 ```text
 OrderServiceTest.calculatesTotal()               src/jvmTest/kotlin/OrderServiceTest.kt:41
@@ -639,9 +632,9 @@ OrderServiceTest.calculatesTotal()               src/jvmTest/kotlin/OrderService
 - `Module.kt`의 `generate { }`도 같은 JVM. `./mole --debug --compile server/domain`.
 - `Proc.run`(native 바이너리, node, tsc)은 프로세스 경계. 재현 명령·stderr·소요 시간을 리포트에.
 
-## 실패 분류
+### 실패 분류
 
-실패의 1차 표현은 **예외 타입**이다. 모든 실패는 `MoleFailure`를 상속한 sealed 계층이고, 어느 단계에서 났는지가 타입에 들어 있다. 콘솔 출력·`summary.json`·IDE 디버거가 같은 타입을 본다. 프로세스 종료 코드는 따로 정의하지 않고 **예외 타입에서 유도**한다. 각 타입이 `exitCode`를 갖고, `main`은 잡은 예외의 그 값으로 종료한다. 코드 표를 외우는 대신 타입 계층을 보면 되고, 새 타입을 추가할 때 코드 충돌을 컴파일러가 잡아 준다.
+실패의 1차 표현은 **예외 타입**이다 (R1). 모든 실패는 `MoleFailure`를 상속한 sealed 계층이고, 어느 단계에서 났는지가 타입에 들어 있다. 콘솔 출력·`summary.json`·IDE 디버거가 같은 타입을 본다. 프로세스 종료 코드는 따로 정의하지 않고 **예외 타입에서 유도**한다. 각 타입이 `exitCode`를 갖고, `main`은 잡은 예외의 그 값으로 종료한다. 코드 표를 외우는 대신 타입 계층을 보면 되고, 새 타입을 추가할 때 코드 충돌을 컴파일러가 잡아 준다.
 
 ```kotlin
 sealed class MoleFailure(val exitCode: Int, message: String, cause: Throwable? = null) : RuntimeException(message, cause)
@@ -704,7 +697,7 @@ TestFailure: server/domain:jvm:test — 2 failed  (build/reports/summary.json)
 exit 6
 ```
 
-## CI
+### CI
 
 ```yaml
 steps:
@@ -737,9 +730,9 @@ steps:
 
 ## FAQ
 
-**모듈의 `src/mole`을 라이브러리로 만들어 `Module.kt`에서 쓰면?** 엔진이 거부한다 (`ModuleDefError: module-libs must be versioned external artifacts`). `module-libs`는 `g:n:v`만 받고 `jar()`·모듈 참조를 받지 않는다. 저장소 안에서 `Module.kt`가 쓸 공용 코드는 루트 `*.kt` (`Presets.kt`)에 둔다. 같은 A 컴파일 단위라 순환이 없다.
-
 **빌드 없이 자동화만 쓸 수 있나?** 예. `Project.kt`와 `src/mole/kotlin/Tasks.kt`. `Module.kt`도 타깃 확장도 필요 없다. 반대로 `Tasks.kt` 없이 `Module.kt`만 있으면 관례 태스크로 빌드·테스트가 된다.
+
+**모듈의 `src/mole`을 라이브러리로 만들어 `Module.kt`에서 쓰면?** 엔진이 거부한다 (`ModuleDefError: module-libs must be versioned external artifacts`). `module-libs`는 `g:n:v`만 받고 `jar()`·모듈 참조를 받지 않는다. 저장소 안에서 `Module.kt`가 쓸 공용 코드는 루트 `*.kt` (`Presets.kt`)에 둔다. 같은 A 컴파일 단위라 순환이 없다.
 
 **`Libs.kt`는 꼭 있어야 하나?** 아니다. `Project.versionCatalog["coroutines"]`로 바로 쓸 수 있다. `Libs.kt`는 별칭에 Kotlin 이름과 타입을 붙여 IDE 자동완성·참조 찾기를 얻으려는 선택 사항이다.
 
@@ -753,15 +746,6 @@ steps:
 
 **Gradle이 하던 증분·캐시·데몬은?** 없음. 해시 up-to-date만. Kotlin/Native 컴파일이 느린 것은 `~/.konan` 캐시와 CI 캐시로 완화한다.
 
-## 라이브러리 선택 원칙
-
-| 순위 | 출처                | 예                                                                                        |
-|------|---------------------|-------------------------------------------------------------------------------------------|
-| 1    | JDK / Kotlin stdlib | `java.util.concurrent`, `ProcessBuilder`, `javax.tools`, `java.net.http`, `java.nio.file` |
-| 2    | Apache              | Maven Resolver, Commons Compress                                                          |
-| 3    | JetBrains           | `kotlin-compiler-embeddable`, KSP2 API, Kotlin/Native 배포 (대체 불가)                    |
-| —    | 도메인 라이브러리   | Testcontainers, Flyway, JUnit Platform                                                    |
-
 ## TODO
 
 설계상 자리는 잡혀 있지만 아직 채워야 할 것들이다.
@@ -769,7 +753,7 @@ steps:
 **플랫폼**
 
 - 1차는 `jvm` 확장으로 두 단계 구조·관례 태스크·투명성 명령을 완성한다.
-- 이후 `native`(linux/macos/mingw/ios/watchos/tvos), `js`, `wasmJs`/`wasmWasi`, Android까지 **KMP가 지원하는 나머지 모든 타깃 확장**을 갖춘다. 목표는 어느 타깃이든 `--model`·`--explain`·`--trace`·`--why`가 같은 깊이로 나오는 것 — 즉 모든 플랫폼에서 같은 빌드 투명성.
+- 이후 `native`(linux/macos/mingw/ios/watchos/tvos), `js`, `wasmJs`/`wasmWasi`, Android까지 **KMP가 지원하는 나머지 모든 타깃 확장**을 갖춘다 (R16). 목표는 어느 타깃이든 `--model`·`--explain`·`--trace`·`--why`가 같은 깊이로 나오는 것 — 즉 모든 플랫폼에서 같은 빌드 투명성.
 - 타깃별 테스트 러너 (테스트 바이너리, node, 브라우저, 시뮬레이터)의 결과를 하나의 `TestResult`로 회수.
 - iOS framework·Xcode 연동, Android AAR·리소스 병합.
 
@@ -790,7 +774,7 @@ steps:
 - **관측**: 태스크 실행 결과를 OpenTelemetry로 내보내기.
 - **IDE**: `./mole idea` 외에 VS Code/Fleet용 모델 출력.
 
-## 미정
+**미정**
 
 - `race` 패자의 부분 산출물 정리
 - `AutomationError`가 감싸는 예외의 재시도 정책을 엔진이 가질지, 태스크에 맡길지
@@ -799,30 +783,62 @@ steps:
 
 다시 말하지만 `mole`은 존재하지 않는다. 다만 "빌드 시스템은 태스크 자동화의 특수한 경우"라는 관점으로 뒤집어 놓고 보면, Gradle이 왜 복잡해졌는지가 반대로 보인다는 게 저자의 생각이다. 빌드 스크립트가 프로젝트 코드와 같은 JVM에서 같은 디버거로 돌고, 도구가 내린 결정이 전부 출력 가능하다는 두 가지만 지켜도 체감은 꽤 다를 것 같다.
 
-## 요구조건
+## 부록
 
-설계의 출발점이 된 요구와 그에 대한 답을 정리한 표다. 본문에서 R1 같은 번호로 참조한다.
+### 요구조건
 
-| #   | 요구                                                            | 답                                                              |
-|-----|-----------------------------------------------------------------|-----------------------------------------------------------------|
-| R1  | 빌드 실패 시 "빌드툴 / 내 코드 / 테스트"가 즉시 구분된다        | 두 단계 경계 + 예외 타입 분류                                   |
-| R2  | 자동화 코드와 프로젝트 코드가 같은 JVM, 같은 디버깅             | 단일 JVM, 동기 직접 호출                                        |
-| R3  | 태스크 트리, 독립 실행, 정의 순서 = 실행 순서 = 의존 순서       | `seq`/`firstOf`(List), `parallel`/`race`(Set)                   |
-| R4  | 타입 있는 입출력, 주입되는 터미널 IO                            | `Task<I,O>`, `pipe`, `IO`                                       |
-| R5  | 컴파일 단계와 자동화 단계 분리                                  | 단계 A / B, 다른 파일                                           |
-| R6  | 자동화 코드가 `main`/`test`를 직접 호출                         | `mole → jvmTest → jvmMain → commonMain` (`commonTest`는 TODO)   |
-| R7  | 의존성: jar 경로 / Maven·Gradle 아티팩트 / `"g:n:v"` / 인스턴스 | `Dependency` 계층                                               |
-| R8  | 버전 카탈로그                                                   | `Project.versionCatalog` (코드 기본, TOML 옵션) + `Libs.kt` 별칭 |
-| R9  | Maven/Gradle 사용자에게 익숙한 구조                             | 모듈 루트 `Module.kt`, KMP 소스셋 관례, 관례 태스크             |
-| R10 | 디렉터리 구조 = 모듈 구조. import로 모듈 간 의존 표현           | `Module.kt`가 있는 디렉터리 = 모듈, `api(server.common.Module)` |
-| R11 | IntelliJ가 자동화 코드를 직접 실행·디버그                       | `@JvmStatic main` + `./mole idea`                               |
-| R12 | 엔진은 다운로드 기본, Maven 아티팩트로도 공유                   | 부트스트랩 스크립트                                             |
-| R13 | 시스템 커맨드·파일 시스템 조작·CI 보고까지 자동화에 포함        | core의 `Proc`/`Fs`                                              |
-| R14 | 동시성은 JDK 표준 → Apache → JetBrains 순                       | `java.util.concurrent`만                                        |
-| R15 | 코드 생성(KSP/APT/빌드 상수)이 컴파일 입력                      | `generate { }`, `ksp`                                           |
-| R16 | KMP 기본, jvm/native/js/wasm은 확장                             | 코어 + 타깃 확장                                                |
-| R17 | 도구가 결정한 것은 전부 출력 가능                               | `--model`, `--tree`, `--explain`, `--why`                       |
+설계의 출발점이 된 요구와 그에 대한 답이다.
+
+| #   | 요구                                                            | 답                                                                   |
+|-----|-----------------------------------------------------------------|----------------------------------------------------------------------|
+| R1  | 빌드 실패 시 "빌드툴 / 내 코드 / 테스트"가 즉시 구분된다        | 두 단계 경계 + 예외 타입 분류                                        |
+| R2  | 자동화 코드와 프로젝트 코드가 같은 JVM, 같은 디버깅             | 단일 JVM, 동기 직접 호출                                             |
+| R3  | 태스크 트리, 독립 실행, 정의 순서 = 실행 순서 = 의존 순서       | `seq`/`firstOf`(List), `parallel`/`race`(Set)                        |
+| R4  | 타입 있는 입출력, 주입되는 터미널 IO                            | `Task<I,O>`, `pipe`, `IO`                                            |
+| R5  | 컴파일 단계와 자동화 단계 분리                                  | 단계 A / B, 다른 파일                                                |
+| R6  | 자동화 코드가 `main`/`test`를 직접 호출                         | `mole → jvmTest → jvmMain → commonMain` (`commonTest`는 TODO)        |
+| R7  | 의존성: jar 경로 / Maven·Gradle 아티팩트 / `"g:n:v"` / 인스턴스 | `Dependency` 계층                                                    |
+| R8  | 버전 카탈로그                                                   | `Project.versionCatalog` (코드 기본, TOML 옵션) + `Libs.kt` 별칭     |
+| R9  | Maven/Gradle 사용자에게 익숙한 구조                             | 모듈 루트 `Module.kt`, KMP 소스셋 관례, 관례 태스크                  |
+| R10 | 디렉터리 구조 = 모듈 구조. import로 모듈 간 의존 표현           | `Module.kt`가 있는 디렉터리 = 모듈, `api(server.common.Module)`      |
+| R11 | IntelliJ가 자동화 코드를 직접 실행·디버그                       | `@JvmStatic main` + `./mole idea`                                    |
+| R12 | 엔진은 다운로드 기본, Maven 아티팩트로도 공유                   | 부트스트랩 스크립트                                                  |
+| R13 | 시스템 커맨드·파일 시스템 조작·CI 보고까지 자동화에 포함        | core의 `Proc`/`Fs`                                                   |
+| R14 | 동시성은 JDK 표준 → Apache → JetBrains 순                       | `java.util.concurrent`만                                             |
+| R15 | 코드 생성(KSP/APT/빌드 상수)이 컴파일 입력                      | `generate { }`, `ksp`                                                |
+| R16 | KMP 기본, jvm/native/js/wasm은 확장                             | 코어 + 타깃 확장                                                     |
+| R17 | 도구가 결정한 것은 전부 출력 가능                               | `--model`, `--tree`, `--explain`, `--why`                            |
 | R18 | 빌드 설정과 자동화가 공존하거나 어느 한쪽만 있어도 된다         | mole-core / mole-build 두 층. 자동화만이면 `Project.kt` + `Tasks.kt` |
+
+### Gradle 대응표
+
+| Gradle                                     | mole                                                                             |
+|--------------------------------------------|----------------------------------------------------------------------------------|
+| `build.gradle.kts` (모듈 루트)             | `Module.kt` (모듈 루트)                                                          |
+| `build.gradle.kts` (루트)                  | `Project.kt`                                                                     |
+| `settings.gradle.kts` + wrapper            | `mole.toml` + `mole`                                                             |
+| `buildSrc`                                 | 루트 `*.kt` (`Presets.kt`)                                                       |
+| `include(":a:b")`                          | 없음. `Module.kt`가 있는 디렉터리가 모듈                                         |
+| `project(":a:b")`                          | `a.b.Module` (import)                                                            |
+| `libs.versions.toml`                       | `Project.versionCatalog` (코드 기본, TOML 가져오기 옵션) + `Libs.kt` 별칭 (옵션) |
+| `kotlin { jvm(); linuxX64() }`             | `targets { jvm(); linuxX64() }`                                                  |
+| `sourceSets.jvmMain.dependencies { }`      | `sourceSets { jvmMain { } }`                                                     |
+| 플러그인                                   | 타깃 확장(A) 또는 `Tasks.kt`(B)                                                  |
+| `tasks.register { dependsOn() }`           | `seq { }` 안 순서                                                                |
+| `:a:b:jvmTest`                             | `a/b:jvm:test`                                                                   |
+| `gradle dependencies`, `dependencyInsight` | `--deps`, `--why`                                                                |
+| 데몬, 빌드 캐시                            | 없음. 해시 up-to-date만                                                          |
+
+### 라이브러리 선택 원칙
+
+엔진 구현에 쓰는 라이브러리는 이 순서로 고른다 (R14).
+
+| 순위 | 출처                | 예                                                                                        |
+|------|---------------------|-------------------------------------------------------------------------------------------|
+| 1    | JDK / Kotlin stdlib | `java.util.concurrent`, `ProcessBuilder`, `javax.tools`, `java.net.http`, `java.nio.file` |
+| 2    | Apache              | Maven Resolver, Commons Compress                                                          |
+| 3    | JetBrains           | `kotlin-compiler-embeddable`, KSP2 API, Kotlin/Native 배포 (대체 불가)                    |
+| —    | 도메인 라이브러리   | Testcontainers, Flyway, JUnit Platform                                                    |
 
 ## 참고
 
