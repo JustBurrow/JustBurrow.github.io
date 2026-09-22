@@ -44,10 +44,10 @@ flowchart TB
     task --> build --> ext
 ```
 
-| 층                  | 무엇                                                                                              | 프로젝트에 있는 것         | 없어도 되나                                                                 |
-|---------------------|---------------------------------------------------------------------------------------------------|----------------------------|-----------------------------------------------------------------------------|
-| **mole-core**       | 태스크 트리를 정의·실행·보고하는 런타임                                                           | `src/mole/kotlin/Tasks.kt` | 빌드만 쓰는 프로젝트는 관례 태스크만으로 동작                               |
-| **mole-build**      | core 위에 만든 빌드 시스템. `Module.kt`로 모듈을 정의하면 컴파일·테스트·패키징 관례 태스크가 생김 | `Module.kt`                | 자동화만 쓰는 프로젝트(운영 스크립트, 데이터 잡, CI 파이프라인)는 없어도 됨 |
+| 층                  | 아티팩트            | 무엇                                                                                              | 프로젝트에 있는 것                                   | 없어도 되나                                                                 |
+|---------------------|---------------------|---------------------------------------------------------------------------------------------------|------------------------------------------------------|-----------------------------------------------------------------------------|
+| **mole-core**       | `kr.lul.mole:core`  | 태스크 트리를 정의·실행·보고하는 런타임. `Tasks`·`RootTasks`·`ModuleTasks`와 `mole.task` API      | `src/mole/kotlin/Tasks.kt`                           | 빌드만 쓰는 프로젝트는 관례 태스크만으로 동작                               |
+| **mole-build**      | `kr.lul.mole:build` | core 위에 만든 빌드 시스템. `Module`·`Project`와 `mole.module` API. `Module.kt`로 모듈을 정의하면 컴파일·테스트·패키징 관례 태스크가 생김 | `Module.kt`                                          | 자동화만 쓰는 프로젝트(운영 스크립트, 데이터 잡, CI 파이프라인)는 없어도 됨 |
 | **타깃 확장**       | build의 타깃별 컴파일러·테스트 러너                                                               | `mole.toml`의 `extensions` | build를 안 쓰면 불필요                                                      |
 | **기본 확장 `sys`** | 서드파티를 끄는 편의 래핑(Testcontainers, Flyway, Http, Git)                                      | `mole.toml`의 `extensions` | 직접 의존성으로 대체 가능                                                   |
 
@@ -73,19 +73,19 @@ flowchart TB
 | 확장 방식   | 타깃 확장 (엔진과 함께 배포) + 루트 `*.kt` (저장소 로컬 프리셋)                                                 | 일반 코드                                                                                  |
 | 실행 환경   | JVM                                                                                                             | JVM. native/js 산출물은 프로세스로 실행                                                    |
 
-역할 분담은 한 줄이다. **`Module.kt`는 `kr.lul.mole:kmp-build`가 프로젝트를 컴파일하는 데 필요한 것만 적고, 그 외의 모든 자동화는 `Tasks.kt`가 한다.** `kmp-build`는 `Project.kt`·루트 `*.kt`·모든 `Module.kt`를 설정 파일로 보고 한 번에 컴파일하므로 셋 사이에 순서는 없다. A는 Gradle이 관례로 해주던 것의 최소 집합이고, B는 플러그인·태스크로 하던 것 전부다. A의 확장점은 타깃 확장과 루트 `*.kt` 둘뿐이다.
+역할 분담은 한 줄이다. **`Module.kt`는 `kr.lul.mole:build`의 `Module`을 상속해 프로젝트를 컴파일하는 데 필요한 것만 적고, 그 외의 모든 자동화는 `kr.lul.mole:core`의 `Tasks`를 상속한 `Tasks.kt`가 한다.** `build`는 `Project.kt`·루트 `*.kt`·모든 `Module.kt`를 설정 파일로 보고 한 번에 컴파일하므로 셋 사이에 순서는 없다. A는 Gradle이 관례로 해주던 것의 최소 집합이고, B는 플러그인·태스크로 하던 것 전부다. A의 확장점은 타깃 확장과 루트 `*.kt` 둘뿐이다.
 
 B는 다시 두 층으로 읽을 수 있다. **기본 자동화**는 A의 결과와 메인 코드 (`commonMain`, `jvmMain`)만 쓰는 태스크 (패키징·배포·운영)이고, **테스트 자동화**는 그 위에 테스트 코드 (`commonTest`, `jvmTest`)까지 쓰는 태스크 (테스트 실행·픽스처 준비)다. 둘 다 같은 `src/mole`에 두고 소스셋을 나누지 않는다. 층은 클래스패스와 컴파일 순서의 문제이지 파일 배치의 문제가 아니기 때문이다.
 
 ### 되먹임 — A는 B를 라이브러리로 굳힌 것
 
-구조적으로 컴파일 단계 (A)는 **자동화 단계 (B)의 코드를 라이브러리로 굳혀 놓은 것**이다. 엔진 코어·타깃 확장·KMP 빌드 시스템 (`kr.lul.mole:kmp-build`)은 전부 어느 저장소의 B 단계 코드가 아티팩트로 배포된 결과이고, 엔진 자신도 `mole`로 빌드된다 (자기 호스팅).
+구조적으로 컴파일 단계 (A)는 **자동화 단계 (B)의 코드를 라이브러리로 굳혀 놓은 것**이다. 엔진 코어·타깃 확장·KMP 빌드 시스템 (`kr.lul.mole:build`)은 전부 어느 저장소의 B 단계 코드가 아티팩트로 배포된 결과이고, 엔진 자신도 `mole`로 빌드된다 (자기 호스팅).
 
 이 되먹임은 **버전 붙은 아티팩트 경계를 넘어서만** 허용한다.
 
 | 경로                                                                                 | 허용                | 이유                                                                                                |
 |--------------------------------------------------------------------------------------|---------------------|-----------------------------------------------------------------------------------------------------|
-| 저장소 X의 `src/mole` → 배포(`kr.lul.mole:kmp-build:0.5.0`) → 저장소 Y의 `mole.toml` | ○                   | 엔진·확장·KMP 빌드 시스템이 만들어지는 정상 경로. `kmp-build` 자체가 이 경로로 배포된 B 단계 코드다 |
+| 저장소 X의 `src/mole` → 배포(`kr.lul.mole:build:0.5.0`) → 저장소 Y의 `mole.toml` | ○                   | 엔진·확장·KMP 빌드 시스템이 만들어지는 정상 경로. `build` 자체가 이 경로로 배포된 B 단계 코드다 |
 | 루트 `*.kt` (`Presets.kt`) → 같은 저장소의 각 `Module.kt`                            | ○                   | 저장소 로컬 프리셋. 같은 A 컴파일 단위 안의 참조일 뿐 되먹임이 아니다                               |
 | 같은 저장소 안에서 `src/mole` 산출물을 `Module.kt`가 참조                            | **×** (엔진이 거부) | 한 Run 안의 순환. A가 B보다 먼저 끝나야 한다는 전제가 깨짐                                          |
 | 같은 저장소의 이전 빌드 산출물을 `jar()`로 A에 넣기                                  | ×                   | "지금 코드"와 "굳힌 코드"가 한 저장소에 공존해 어느 쪽이 진실인지 헷갈림                            |
@@ -121,7 +121,7 @@ maven = ["https://repo.maven.apache.org/maven2", "https://repo.lul.kr/maven-publ
 local = true                                  # ~/.m2
 
 [module-libs]                                 # Project.kt·Module.kt가 import 할 수 있는 확장 라이브러리
-libs = ["kr.lul.mole:kmp-build:0.5.0"]
+libs = ["kr.lul.mole:build:0.5.0"]
 ```
 
 엔진은 부트스트랩 스크립트가 다운로드하고, Maven 아티팩트로도 공유된다 (R12). 요구사항은 JDK 21+.
@@ -240,7 +240,7 @@ flowchart LR
 // server/domain/Module.kt
 package server.domain
 
-import mole.module.*
+import mole.module.*                               // kr.lul.mole:build
 import mole.jvm.*                                  // jvm 확장 API
 import mole.native.*                               // native 확장 API
 import server.common.Module as common              // 다른 모듈의 컴파일 단계 코드
@@ -420,7 +420,7 @@ object Libs {
 그룹은 저장소 밖으로도 공유된다. 조직 공용 그룹 선언을 `module-libs` 아티팩트로 배포하면 각 저장소의 `Project.kt`는 그 그룹을 등록하고 아티팩트 이름만 적는다 (위 `Groups.lul`).
 
 ```kotlin
-// kr.lul.mole:kmp-build 에 들어 있는 조직 공용 그룹 (배포된 A 단계 라이브러리)
+// kr.lul.mole:build 에 들어 있는 조직 공용 그룹 (배포된 A 단계 라이브러리)
 package kr.lul.mole.catalog
 object Groups {
     val kotlin = Group("org.jetbrains.kotlin", "2.2.20")
@@ -437,7 +437,7 @@ object Groups {
 
 ## B. 자동화 단계 — `src/mole/kotlin`
 
-이 절이 mole-core다. 빌드가 없는 프로젝트에서는 관례 태스크만 비어 있고 나머지는 같다.
+이 절이 mole-core (`kr.lul.mole:core`)다. `Tasks`·`RootTasks`·`ModuleTasks`와 `mole.task` API가 여기서 온다. 빌드가 없는 프로젝트에서는 관례 태스크만 비어 있고 나머지는 같다.
 
 ### 관례 태스크
 
@@ -475,7 +475,7 @@ $ ./mole build                           # 루트: 모든 모듈 build
 // server/domain/src/mole/kotlin/Tasks.kt
 package server.domain
 
-import mole.task.*
+import mole.task.*                                   // kr.lul.mole:core
 import server.domain.Module                          // A 단계 코드
 import server.domain.migration.SeedData              // jvmMain
 import server.domain.testsupport.TestDatabase        // jvmTest 픽스처
