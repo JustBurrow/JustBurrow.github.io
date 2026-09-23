@@ -7,13 +7,11 @@ title: "mole — Kotlin으로 쓰는 태스크 자동화 런타임 설계 메모
 
 ## 왜 이런 걸 생각했나
 
-Gradle로 Kotlin Multiplatform 프로젝트를 굴리다 보면 반복해서 부딪히는 불만이 있다.
+웬만한 프로젝트에는 코드 바깥의 일이 딸려 온다. 배포, 백업, 스키마 마이그레이션, 리포트 수집, 시크릿 교체, 릴리스 준비. 보통 `scripts/` 아래에 셸이나 Python으로 쌓이는데, 그러다 보면 반복해서 부딪히는 불만이 있다.
 
-1. 빌드가 깨졌을 때 **도구 문제인지, 내 코드 문제인지, 테스트 실패인지** 한눈에 안 들어온다.
-2. 빌드 스크립트와 프로젝트 코드가 따로 논다. 태스크 안에서 테스트 픽스처를 재사용하고 싶어도 쉽지 않고, 브레이크포인트를 걸어도 태스크 정의가 콜스택에 안 보인다.
-3. `dependsOn`, `mustRunAfter`, 플러그인이 등록하는 태스크… 무엇이 어떤 순서로 도는지 추적하려면 `--scan`을 켜야 한다.
-
-빌드 바깥도 마찬가지다. 배포·백업·마이그레이션·리포트를 셸 스크립트나 Python으로 짜 두면 타입이 없고, IDE가 못 따라오고, 프로젝트 코드의 상수 하나를 재사용하려 해도 문자열로 베껴 써야 한다.
+1. 실패했을 때 **환경이 틀린 건지, 내가 짠 자동화 코드가 틀린 건지, 작업 자체가 실패한 건지** 한눈에 안 들어온다. 어느 쪽이든 `exit 1`이다.
+2. 자동화 코드와 프로젝트 코드가 따로 논다. 프로젝트의 상수 하나, 도메인 타입 하나, 테스트 픽스처 하나를 재사용하려 해도 문자열로 베껴 써야 한다. 타입이 없고, IDE가 못 따라오고, 브레이크포인트도 못 건다.
+3. 스크립트가 다른 스크립트를 부르기 시작하면 무엇이 어떤 순서로 도는지 추적할 방법이 없다. 결국 누군가 주석으로 순서를 적어 두고, 그 주석이 먼저 낡는다.
 
 그래서 **프로젝트의 자동화를 프로젝트가 직접 관리하게** 해 봤다. 태스크를 프로젝트와 같은 Kotlin·같은 JVM·같은 디버거에 두면 불만 2가 바로 풀린다. 불만 1은 실행 단계마다 다른 예외 타입을 두는 실패 분류로, 불만 3은 "정의 순서 = 실행 순서"와 `--tree`로 답한다.
 
@@ -66,7 +64,7 @@ flowchart LR
 
 `Project.kt`는 Kotlin이지만 **설정 파일로 다룬다.** 프로젝트 소스와 같은 컴파일 단위에 넣지 않고, 엔진 API만 보이는 클래스패스에서 따로 컴파일해 초기화한다. 그래서 설정은 컴파일보다 항상 먼저 끝나고, `src/mole`의 산출물이 `Project.kt`에 되먹임될 수 없다. 이 경계가 실패 분류 (R1)의 첫 칸이다.
 
-단계가 셋뿐이라 진단이 짧다. `mole.toml`이 틀렸나 (3), 의존성 선언이 틀렸나 (4), 내 코드가 안 붙나 (5), 태스크가 실패했나 (6+). 저자가 Gradle에서 가장 아쉬웠던 지점이 이것이고, 이 글의 설계 대부분은 그 네 칸을 흐리지 않기 위한 제약이다.
+단계가 셋뿐이라 진단이 짧다. `mole.toml`이 틀렸나 (3), 의존성 선언이 틀렸나 (4), 내 코드가 안 붙나 (5), 태스크가 실패했나 (6+). 불만 1이 겨냥하는 것이 이 구분이고, 이 글의 설계 대부분은 그 네 칸을 흐리지 않기 위한 제약이다.
 
 ## 시작하기
 
@@ -100,7 +98,7 @@ local = true                                  # ~/.m2
 libs = ["kr.lul:mole-catalog:3.1.0"]
 ```
 
-엔진은 부트스트랩 스크립트가 받아 온다. Maven 아티팩트라 사내 미러로도 배포된다 (R10). 요구사항은 JDK 21+.
+엔진은 부트스트랩 스크립트가 받아 온다. 평범한 아티팩트라 사내 미러에 올려 두고 써도 된다 (R10). 요구사항은 JDK 21+.
 
 `mole.toml`이 유일하게 코드가 아닌 파일인 이유는 순환 때문이다. 엔진을 실행해야 `Project.kt`를 컴파일할 수 있는데, 어느 엔진을 쓸지까지 코드로 적으면 닭이 먼저인지 달걀이 먼저인지 알 수 없다. 그래서 **"어떤 엔진"만 데이터로 적고 나머지는 전부 Kotlin**이다.
 
@@ -136,7 +134,7 @@ object Tasks : Tasks() {
     val nightly = seq {
         +backup
         +rotate
-        +task("report") { report.writeJson(file("build/reports/summary.json")) }
+        +task("report") { report.writeJson(file(".mole/reports/summary.json")) }
     }
 
     @JvmStatic
@@ -163,7 +161,7 @@ $ ./mole nightly
 
 ### 순서 = 정의 순서 = 의존 순서
 
-`after`/`dependsOn`이 없다 (R3). 컨테이너 안에서 **앞 태스크가 뒤 태스크의 선행**이다. 순서는 소스에 적힌 순서 그대로이고, 별도의 그래프 선언이 없다.
+선행 관계를 따로 선언하는 API가 없다 (R3). 컨테이너 안에서 **앞 태스크가 뒤 태스크의 선행**이다. 순서는 소스에 적힌 순서 그대로이고, 별도의 그래프 선언이 없다. 순서를 바꾸려면 줄을 옮긴다.
 
 | 컨테이너         | 자식   | 실행                  | 성공                                         | 콜스택                    |
 |------------------|--------|-----------------------|----------------------------------------------|---------------------------|
@@ -215,7 +213,7 @@ val r = Proc.run(
 r.exitCode; r.stdout; r.stderr; r.duration; r.command
 r.orThrow()                                   // exit != 0 → ProcessFailure (재현 명령 포함)
 
-Proc.shell("grep -c ERROR build/log/*.txt | sort")   // 명시적으로만 셸. 기본은 인자 배열
+Proc.shell("grep -c ERROR logs/*.txt | sort")   // 명시적으로만 셸. 기본은 인자 배열
 Proc.which("docker") ?: throw EnvironmentFailure("docker not found")
 Proc.java(mainClass, classpath, jvmArgs)      // 명시 fork (격리가 필요한 작업)
 Proc.start(...)                               // 백그라운드. run.onClose에 자동 등록
@@ -228,7 +226,7 @@ Proc.start(...)                               // 백그라운드. run.onClose에
 ### `Fs` — 파일 시스템
 
 ```kotlin
-val f = file("build/out/app.json")            // 저장소 루트 기준
+val f = file(".mole/out/app.json")            // 저장소 루트 기준
 f.exists(); f.isDir(); f.size(); f.mtime(); f.sha256()
 
 Fs.write(f, text); Fs.read(f); Fs.append(f, text)
@@ -327,7 +325,7 @@ data class Group(val id: String, val version: String? = null) {
 | `./mole --compile`           | 설정·컴파일까지만 하고 실행하지 않음                                                        |
 | `./mole <태스크> --trace`    | 각 태스크 진입·종료·반환값·소요 시간과 소스 위치. `Proc` 명령과 `Fs` 쓰기 조작 전부         |
 | `./mole <태스크> --dry-run`  | `Fs` 쓰기와 `Proc.run`을 기록만 하고 실행하지 않음                                          |
-| `build/reports/summary.json` | 실행 결과 전체. 트리·시간·분류·실패 상세·absorbed                                           |
+| `.mole/reports/summary.json` | 실행 결과 전체. 트리·시간·분류·실패 상세·absorbed                                           |
 
 ```text
 $ ./mole --tree nightly
@@ -410,7 +408,7 @@ nightly                            seq
 ├─ rotate                          FAIL  0.9s                                   ← EnvironmentFailure
 │     vault: connection refused (VAULT_ADDR=http://127.0.0.1:8200)
 └─ report                          skipped
-EnvironmentFailure: rotate — vault unreachable  (build/reports/summary.json)
+EnvironmentFailure: rotate — vault unreachable  (.mole/reports/summary.json)
 exit 8
 ```
 
@@ -427,7 +425,7 @@ steps:
   - run: ./mole nightly              # 실행. exit 1 또는 6–8
   - uses: actions/upload-artifact@v7
     if: always()
-    with: { name: reports, path: build/reports }
+    with: { name: reports, path: .mole/reports }
 ```
 
 {% endraw %}
@@ -453,11 +451,11 @@ steps:
 
 **태스크가 만든 코드를 컴파일 입력으로?** 이 런타임에는 없다. `src/mole`은 한 번 컴파일되고 그다음 실행이다. 필요하면 두 번의 Run으로 나눈다 — 첫 Run이 소스를 만들고, 두 번째 Run이 그것을 쓴다.
 
-**증분 빌드·캐시·데몬은?** 없다. `Fs.fingerprint` 기반 up-to-date 판정만 있다. 자동화 태스크는 대부분 외부 시스템을 건드려서 캐시 무효화 판단이 어렵고, 데몬은 "숨은 상태 없음"과 정면으로 부딪힌다. `src/mole` 컴파일이 느려지면 그때 원격 해시 캐시를 붙일 생각이다 (아래 TODO).
+**두 번째 실행은 빨라지나?** 컴파일 결과는 재사용하고, 태스크는 `Fs.fingerprint` 기반 up-to-date 판정만 한다. 상주 프로세스를 띄워 두는 방식은 쓰지 않는다. 자동화 태스크는 대부분 외부 시스템을 건드려서 결과를 캐시해 두면 언제 무효화할지 판단하기 어렵고, 상주 프로세스는 "숨은 상태 없음"과 정면으로 부딪히기 때문이다. `src/mole` 컴파일이 느려지면 그때 원격 해시 캐시를 붙일 생각이다 (아래 TODO).
 
 **`mole.toml` 대신 `Project.kt`에 엔진 버전을 적으면?** 순환이다. `Project.kt`를 컴파일하려면 이미 엔진이 있어야 한다. 이 파일 하나만 데이터로 남긴 이유다.
 
-**확장은 어떻게 만드나?** 확장도 그냥 Maven 아티팩트다. 어느 저장소에서 `mole`로 만들어 버전을 붙여 배포하면 다른 저장소가 `mole.toml`의 `extensions`나 `Project.mole`에 적어 쓴다. `sys`도 그렇게 만든 것이다. 확장을 만드는 일과 태스크를 쓰는 일에 문법 차이가 없다는 것이 의도한 바다.
+**확장은 어떻게 만드나?** 확장도 그냥 아티팩트다. 어느 저장소에서 `mole`로 만들어 버전을 붙여 배포하면 다른 저장소가 `mole.toml`의 `extensions`나 `Project.mole`에 적어 쓴다. `sys`도 그렇게 만든 것이다. 확장을 만드는 일과 태스크를 쓰는 일에 문법 차이가 없다는 것이 의도한 바다.
 
 ## TODO
 
@@ -489,11 +487,11 @@ steps:
 | R3  | 태스크 트리, 독립 실행, 정의 순서 = 실행 순서            | `seq`/`firstOf`(List), `parallel`/`race`(Set)       |
 | R4  | 타입 있는 입출력, 주입되는 터미널 IO                     | `Task<I,O>`, `pipe`, `IO`                           |
 | R5  | 설정과 실행의 분리                                       | 설정 → 컴파일 → 실행, 다른 파일                     |
-| R6  | 의존성: jar 경로 / Maven 아티팩트 / `"g:n:v"` / 인스턴스 | `Dependency` 계층                                   |
+| R6  | 의존성: jar 경로 / 원격 아티팩트 / `"g:n:v"` / 인스턴스  | `Dependency` 계층                                   |
 | R7  | 자동화 코드는 스크립트가 아니라 소스셋                   | `src/mole/kotlin`, 패키지·리소스·테스트 가능        |
 | R8  | 도구가 결정한 것은 전부 출력 가능                        | `--tree`, `--explain`, `--trace`, `--why`, `--deps` |
 | R9  | IDE가 자동화 코드를 직접 실행·디버그                     | `@JvmStatic main` + `./mole idea`                   |
-| R10 | 엔진은 다운로드 기본, Maven 아티팩트로도 공유            | runner 부트스트랩 스크립트 + `mole.toml`            |
+| R10 | 엔진은 다운로드 기본, 아티팩트 저장소로도 공유           | runner 부트스트랩 스크립트 + `mole.toml`            |
 | R11 | 시스템 커맨드·파일 조작·CI 보고까지 런타임에 포함        | core의 `Proc`/`Fs`/`report`                         |
 | R12 | 동시성은 JDK 표준 → Apache → JetBrains 순                | `java.util.concurrent`만                            |
 
@@ -510,12 +508,12 @@ steps:
 
 ## 참고
 
-1. [Kotlin Multiplatform][1]
-2. [Gradle Version Catalogs][2]
+1. [ProcessBuilder (Java Platform SE 21)][1]
+2. [Apache Maven Artifact Resolver][2]
 3. [JUnit Platform Launcher API][3]
 4. [Debug asynchronous code — IntelliJ IDEA][4]
 
-[1]: https://kotlinlang.org/docs/multiplatform.html
-[2]: https://docs.gradle.org/current/userguide/version_catalogs.html
+[1]: https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/ProcessBuilder.html
+[2]: https://maven.apache.org/resolver/
 [3]: https://junit.org/junit5/docs/current/user-guide/#launcher-api
 [4]: https://www.jetbrains.com/help/idea/debug-asynchronous-code.html
